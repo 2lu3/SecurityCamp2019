@@ -15,10 +15,10 @@ using std::uint8_t;
 
 #define FOR for
 #define rep(i, n) FOR(int64_t i = 0; i < n; ++i)
-// ç¾åœ¨ã®é–¢æ•°åã‚’å–å¾—
+// Œ»Ý‚ÌŠÖ”–¼‚ðŽæ“¾
 #define FUNCNAME getFuncName(__FUNCTION__)
 
-// const char*åž‹ã‹ã‚‰stringåž‹ã¸ã¨cast
+// const char*Œ^‚©‚çstringŒ^‚Ö‚Æcast
 inline string getFuncName(const char *name)
 {
     return name;
@@ -29,61 +29,68 @@ DataBase::DataBase()
     FILE *fp = fopen("data.csv", "r");
     if (fp == NULL)
     {
-        cout << "ãƒ•ã‚¡ã‚¤ãƒ«ãŒé–‹ãã¾ã›ã‚“" << endl;
+        cout << "ƒtƒ@ƒCƒ‹‚ªŠJ‚«‚Ü‚¹‚ñ" << endl;
     }
     int id, money;
     char name[10];
-    Record value;
+    Record record;
     rep(i, data_num)
     {
-        fscanf(fp, "%d,%[^,],%d", &id, name, &money);
-        value.id = id - 1;
-        value.name = name;
-        value.money = money;
-        cout << value.id << " " << value.name << " " << value.money << endl;
-        primary_index[value.id] = value;
-        name_record_map[value.name] = value;
+        if (fscanf(fp, "%d,%[^,],%d", &id, name, &money) == EOF)
+        {
+            cerr << "Error: failed to fscanf" << endl;
+        }
+        record.id = id - 1;
+        record.name = name;
+        record.money = money;
+        primary_index[record.id] = record;
+        name_record_map[record.name] = record;
     }
-    cout << name_record_map[name].name << endl;
     fclose(fp);
 }
 
 int DataBase::begin()
 {
+    return kSuccess;
 }
 
 int DataBase::createKey(string columns[])
 {
+    return kSuccess;
 }
 
 int DataBase::readRecord(string name, Record *return_record)
 {
-    cout << "hello" << endl;
-    cout << "record " << name_record_map["ä¸­å·"].name << endl;
-    // *return_record = static_cast<Record>(name_record_map[name]);
+    *return_record = name_record_map[name];
     return 0;
 }
 
 int DataBase::updateRecord()
 {
+    return kSuccess;
 }
 
 int DataBase::deleteRecord()
 {
+    return kSuccess;
 }
 
 int DataBase::insertRecord()
 {
+    return kSuccess;
 }
 
 int DataBase::commit()
 {
+    return kSuccess;
 }
 
 int DataBase::abort()
 {
+    return kSuccess;
 }
 
 int DataBase::crashRecovery()
 {
+    return kSuccess;
 }

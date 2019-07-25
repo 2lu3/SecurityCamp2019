@@ -6,11 +6,9 @@ using std::endl;
 
 int main()
 {
+    system("chcp 932");
     DataBase dataBase;
     DataBase::Record record;
-    dataBase.readRecord("è—¤ç”°", &record);
-    // cout << endl
-    //      << endl
-    //      << endl;
-    // cout << record.id << " " << record.name << " " << record.money << endl;
+    dataBase.readRecord("“¡“c", &record);
+    cout << record.id << " " << record.name << " " << record.money << endl;
 }
