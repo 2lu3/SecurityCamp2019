@@ -14,6 +14,7 @@ public:
     struct Record
     {
         // column
+        // map<string, string>型を使うことで、自由かつ動的にcolumnを扱えるようにする
         std::map<std::string, std::string> columns;
     };
     const static int kSuccess = 1;
