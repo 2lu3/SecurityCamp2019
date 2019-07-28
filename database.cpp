@@ -106,8 +106,18 @@ int DataBase::deleteRecord()
     return kSuccess;
 }
 
-int DataBase::insertRecord()
+int DataBase::insertRecord(Record new_record)
 {
+    for (const auto &[key, value] : new_record.columns)
+    {
+        // column_namesに登録されているかチェック
+        if (column_names.count(key) != 1)
+        {
+            new_record.columns.erase(key);
+        }
+    }
+    table[table_num] = new_record;
+    table_num++;
     return kSuccess;
 }
 
