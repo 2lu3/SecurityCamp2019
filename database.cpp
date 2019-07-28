@@ -34,16 +34,6 @@ DataBase::DataBase()
     {
         cout << "ファイルが開きません" << endl;
     }
-    int id, money;
-    char name[10];
-    Record record;
-    rep(i, data_num)
-    {
-        if (fscanf(fp, "%d,%[^,],%d", &id, name, &money) == EOF)
-        {
-            cerr << "Error: failed to fscanf" << endl;
-        }
-    }
     fclose(fp);
 }
 
