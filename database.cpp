@@ -57,6 +57,7 @@ int DataBase::createKey(std::string columns[])
     return kSuccess;
 }
 
+// 
 int DataBase::readRecord(map<string, string> target_columns, vector<Record> *record_vector)
 {
     vector<int> vec;
