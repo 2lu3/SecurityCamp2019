@@ -1,6 +1,7 @@
 #include "database.hpp"
 
 #include <iostream>
+#include <vector>
 
 using std::cerr;
 using std::cout;
@@ -8,10 +9,12 @@ using std::endl;
 using std::extent;
 using std::fscanf;
 using std::int64_t;
+using std::map;
 using std::string;
 using std::to_string;
 using std::uint64_t;
 using std::uint8_t;
+using std::vector;
 
 #define FOR for
 #define rep(i, n) FOR(int64_t i = 0; i < n; ++i)
@@ -40,11 +43,6 @@ DataBase::DataBase()
         {
             cerr << "Error: failed to fscanf" << endl;
         }
-        record.id = id - 1;
-        record.name = name;
-        record.money = money;
-        primary_index[record.id] = record;
-        name_record_map[record.name] = record;
     }
     fclose(fp);
 }
@@ -54,14 +52,46 @@ int DataBase::begin()
     return kSuccess;
 }
 
-int DataBase::createKey(string columns[])
+int DataBase::createKey(std::string columns[])
 {
     return kSuccess;
 }
 
-int DataBase::readRecord(string name, Record *return_record)
+int DataBase::readRecord(map<string, string> target_columns, vector<Record> *record_vector)
 {
-    *return_record = name_record_map[name];
+    vector<int> vec;
+    rep(i, table_num)
+    {
+        vec.emplace_back(i);
+    }
+    for (const auto &[key, value] : target_columns)
+    {
+        // keyが存在するかチェック
+        if (column_names.count(key) == 1)
+        {
+            // 残っている候補を順番に確かめる
+            for (auto it = vec.begin(); it != vec.end(); ++it)
+            {
+                // もし、値が一致しない場合
+                if (table[*it].columns[key] != value)
+                {
+                    // vecから削除
+                    vec.erase(it);
+                }
+            }
+        }
+        else
+        {
+            cerr << "Error: " << FUNCNAME << "(): there is no key '" << key << "' in column_names" << endl;
+            return kFailure;
+        }
+    }
+
+    for (auto it = vec.begin(); it != vec.end(); ++it)
+    {
+        record_vector->emplace_back(table[*it]);
+    }
+    return kSuccess;
     return 0;
 }
 
@@ -72,6 +102,7 @@ int DataBase::updateRecord()
 
 int DataBase::deleteRecord()
 {
+
     return kSuccess;
 }
 
