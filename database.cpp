@@ -48,46 +48,57 @@ int DataBase::createKey(std::string columns[])
 }
 
 /*
-    条件に合うRecordを返す
-    target_columnsは、例えば<"name", "山田">のように、条件を指定する(複数可)
-    record_vectorは、条件に合うRecord(複数可)を格納するためのポインタ渡し
+    target_columnsで指定した条件にあうRecord(複数可)を返す関数
+    用例:
+    map<string, string> mp;
+    mp["name"] = "山田";
+    mp["gender"] = "male"; // 条件を指定
+    vector<Record> record_receiver; // Recordを受け取るためのvector
+    dataBase.readRecord(mp, record_receiver);
+    for(auto &value : vec) {
+        // valueは、mpで指定した条件に合うRecord
+    }
 */
-int DataBase::readRecord(map<string, string> target_columns, vector<Record> *record_vector)
+int DataBase::readRecord(const map<string, string> &target_columns, vector<Record> &return_records)
 {
     // 絞り込んでいる最中/絞り込んだtableの添字の集合
-    // 最初は、0~table_numまですべて
-    vector<int> vec;
+    vector<int> narrowed_table_index;
+    // 最初は、0~レコードの数まですべて
     rep(i, table_num)
     {
-        vec.emplace_back(i);
+        narrowed_table_index.emplace_back(i);
     }
+
+    // 複数の条件を、順番に確認していく
     for (const auto &[column_name, column_value] : target_columns)
     {
         // column_nameが存在するかチェック
+        // column_namesには、現在使われているcolumnの名前がすべて格納されている
         if (column_names.count(column_name) == 1)
         {
-            // 残っている候補を順番に確かめる
-            for (auto it = vec.begin(); it != vec.end(); ++it)
+            // 条件にあわないRecordの添字をnarrowed_table_indexから消去していく
+            for (auto it = narrowed_table_index.begin(); it != narrowed_table_index.end(); ++it)
             {
                 // もし、値が一致しない場合は、条件に合っていないということ
                 if (table[*it].columns[column_name] != column_value)
                 {
-                    // vecから削除
-                    vec.erase(it);
+                    // narrowed_table_indexから削除
+                    narrowed_table_index.erase(it);
                 }
             }
         }
         else
         {
+            // 存在しないcolumnの名前を指定された場合
             cerr << "Error: " << FUNCNAME << "(): there is no column_name '" << column_name << "' in column_names" << endl;
             return kFailure;
         }
     }
 
-    // record_vectorに、絞り込んだtableを代入していく
-    for (auto it = vec.begin(); it != vec.end(); ++it)
+    // return_recordsに、絞り込んだRecordを代入していく
+    for (auto it = narrowed_table_index.begin(); it != narrowed_table_index.end(); ++it)
     {
-        record_vector->emplace_back(table[*it]);
+        return_records.emplace_back(table[*it]);
     }
     return kSuccess;
 }

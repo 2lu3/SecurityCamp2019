@@ -15,33 +15,32 @@ public:
     {
         // column
         // map<string, string>型を使うことで、自由かつ動的にcolumnを扱えるようにする
+        // 用例:
+        // columns["name"] = "Hoge";
+        // columns["age"] = "2020";
         std::map<std::string, std::string> columns;
     };
-    const static int kSuccess = 1;
-    const static int table_max_num = 100;
-    Record table[table_max_num];
-    const static int kFailure = 0;
+    const static int table_max_num = 100; // 保持できるRecordの最大値(デバッグ用にpublicにおいているが、privateに移す予定)
+    Record table[table_max_num];          // データベースのデータそのもの(デバッグ用にpublicにおいているが、privateに移す予定)
+    const static int kSuccess = 1;        // 関数の戻り値で、成功を表す
+    const static int kFailure = 0;        // 関数の戻り値で、失敗を表す
     DataBase();
-    int crashRecovery();
-    int begin();
-    int readRecord(std::map<std::string, std::string> target_columns, std::vector<Record> *record_vector);
-    int updateRecord();
-    int deleteRecord();
-    int insertRecord(Record new_record);
-    int commit();
-    int abort();
-    int createKey(std::string columns[]);
+    int crashRecovery();                  // 未実装
+    int begin();                          // 未実装
+    int updateRecord();                   // 未実装
+    int deleteRecord();                   // 未実装
+    int commit();                         // 未実装
+    int abort();                          // 未実装
+    int createKey(std::string columns[]); // 未実装
+
+    int readRecord(const std::map<std::string, std::string> &target_columns, std::vector<Record> &return_records); // target_columnsで指定した条件に合うRecordを返す
+    int insertRecord(Record new_record);                                                                           // new_recordのコピーをtableに追加する
 
 private:
-    const static int column_max_num = 10;
-    const int data_num = 50;
-    int column_num = 0;
+    // 現在の、tableに格納されているRecordの数
     int table_num = 0;
 
     std::set<std::string> column_names{"name", "age"};
-
-    // key-Record
-    std::multimap<std::string, Record> index_maps[column_max_num];
 };
 
 #endif //SECURITYCAMP2019_DATABASE_HPP_
