@@ -34,7 +34,7 @@ public:
     int createKey(std::string columns[]); // 未実装
 
     int readRecord(const std::map<std::string, std::string> &target_columns, std::vector<Record> &return_records); // target_columnsで指定した条件に合うRecordを返す
-    int insertRecord(Record new_record);                                                                           // new_recordのコピーをtableに追加する
+    int insertRecord(const Record &new_record);                                                                    // new_recordのコピーをtableに追加する
 
 private:
     // 現在の、tableに格納されているRecordの数

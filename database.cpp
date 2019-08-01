@@ -19,13 +19,7 @@ using std::vector;
 #define FOR for
 #define rep(i, n) FOR(int64_t i = 0; i < n; ++i)
 // 現在の関数名を取得
-#define FUNCNAME getFuncName(__FUNCTION__)
-
-// const char*型からstring型へとcast
-inline string getFuncName(const char *name)
-{
-    return name;
-}
+#define FUNCNAME __FUNCTION__
 
 DataBase::DataBase()
 {
@@ -62,11 +56,11 @@ int DataBase::createKey(std::string columns[])
 int DataBase::readRecord(const map<string, string> &target_columns, vector<Record> &return_records)
 {
     // 絞り込んでいる最中/絞り込んだtableの添字の集合
-    vector<int> narrowed_table_index;
+    vector<int> selected_table_index;
     // 最初は、0~レコードの数まですべて
     rep(i, table_num)
     {
-        narrowed_table_index.emplace_back(i);
+        selected_table_index.emplace_back(i);
     }
 
     // 複数の条件を、順番に確認していく
@@ -76,14 +70,14 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
         // column_namesには、現在使われているcolumnの名前がすべて格納されている
         if (column_names.count(column_name) == 1)
         {
-            // 条件にあわないRecordの添字をnarrowed_table_indexから消去していく
-            for (auto it = narrowed_table_index.begin(); it != narrowed_table_index.end(); ++it)
+            // 条件にあわないRecordの添字をselected_table_indexから消去していく
+            for (auto it = selected_table_index.begin(); it != selected_table_index.end(); ++it)
             {
                 // もし、値が一致しない場合は、条件に合っていないということ
                 if (table[*it].columns[column_name] != column_value)
                 {
-                    // narrowed_table_indexから削除
-                    narrowed_table_index.erase(it);
+                    // selected_table_indexから削除
+                    selected_table_index.erase(it);
                 }
             }
         }
@@ -96,7 +90,7 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     }
 
     // return_recordsに、絞り込んだRecordを代入していく
-    for (auto it = narrowed_table_index.begin(); it != narrowed_table_index.end(); ++it)
+    for (auto it = selected_table_index.begin(); it != selected_table_index.end(); ++it)
     {
         return_records.emplace_back(table[*it]);
     }
@@ -114,14 +108,16 @@ int DataBase::deleteRecord()
     return kSuccess;
 }
 
-int DataBase::insertRecord(Record new_record)
+// table[]の末尾に新しいRecordを追加
+int DataBase::insertRecord(const Record &new_record)
 {
     for (const auto &[key, value] : new_record.columns)
     {
         // column_namesに登録されているかチェック
         if (column_names.count(key) != 1)
         {
-            new_record.columns.erase(key);
+            cerr << "key '" << key << "' is not registered" << endl;
+            return kFailure;
         }
     }
     table[table_num] = new_record;
