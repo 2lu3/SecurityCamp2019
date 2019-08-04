@@ -26,7 +26,7 @@ int main()
     dataBase.insertRecord(record2);
 
     // •Û‘¶‚³‚ê‚Ä‚¢‚é‚©‚ÌŠm”F
-    cout << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
+    cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
 
     vector<DataBase::Record> vec;   // ğŒ‚É‡‚¤Record‚ğŠi”[‚·‚é‚½‚ß‚Ì•Ï”
     map<string, string> conditions; // ğŒ

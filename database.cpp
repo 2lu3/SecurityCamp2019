@@ -12,6 +12,7 @@ using std::int64_t;
 using std::map;
 using std::string;
 using std::to_string;
+using std::uint32_t;
 using std::uint64_t;
 using std::uint8_t;
 using std::vector;
@@ -23,6 +24,13 @@ using std::vector;
 
 DataBase::DataBase()
 {
+    // Record初期化
+
+    for (int i = 0; i < table_num; ++i)
+    {
+        table[i].id = 0;
+    }
+
     FILE *fp = fopen("data.csv", "r");
     if (fp == NULL)
     {
@@ -97,30 +105,133 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     return kSuccess;
 }
 
-int DataBase::updateRecord()
+// id : 変更する前のRecordのid
+// update_record_condition : 変更後のRecord
+// target_recordを使用して、tableでの添字を取得し、update_record_conditionを代入する
+int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
 {
+    // idが変更されていないかチェック
+    if (id != update_record_condition.id)
+    {
+        cerr << FUNCNAME << "(): id of target_record and update_record_condition is not same" << endl;
+        return kFailure;
+    }
+
+    // update_record_conditionが制約に反していないかチェックする
+    if (checkRecord(update_record_condition, CHECK_RECORD_OPTION_UPDATE) == kFailure)
+    {
+        return kFailure;
+    }
+
+    // idから、primary_indexを使って、table[]の添字を取得
+    uint32_t target_table_index = primary_index[id];
+    // 変更する対象の添字に、update_record_conditionを代入
+    table[target_table_index] = update_record_condition;
+    return kSuccess;
+}
+// target_record : 変更する前のRecord
+// update_record_condition : 変更後のRecord
+// target_recordを使用して、tableでの添字を取得し、update_record_conditionを代入する
+int DataBase::updateRecord(const Record &target_record, const Record &update_record_condition)
+{
+    if (target_record.id == 0)
+    {
+        return kFailure;
+    }
+    return updateRecord(target_record.id, update_record_condition);
+}
+
+// check_recordで与えられたRecordが制約に収まっているかチェックする
+// option: チェックする内容がRecordのinsertとupdateで微妙に違う 0:insert 1:update
+int DataBase::checkRecord(const Record &check_record, int option)
+{
+    // 制約1: idはユニークである
+    // insertのときのみ
+    if (option == CHECK_RECORD_OPTION_INSERT)
+    {
+        // idがすでに登録されている場合
+        if (primary_index.count(check_record.id) != 0)
+        {
+            return kFailure;
+        }
+    }
+
+    // 制約2: idは0以外である
+    // insertのときは、自動でidを割り振る
+    if (option == CHECK_RECORD_OPTION_INSERT)
+    {
+        int random_id = rnd();
+        while (primary_index.count(random_id) == 1)
+        {
+            random_id = rnd();
+        }
+    }
+    else // option == CHECK_RECORD_OPTION_UPDATE
+    {
+        if (check_record.id == 0)
+        {
+            return kFailure;
+        }
+    }
+
+    // 制約3: columnに登録されている(map型での)keyの集合は、column_namesに格納されている文字列の集合と等価でなければならない
+    // insert, update 両方
+
+    // check_recordにあるが、column_namesにはないものを探す
+    for (const auto &[key, value] : check_record.columns)
+    {
+        // column_namesに登録されているかチェック
+        if (column_names.count(key) != 1)
+        {
+            cerr << "key '" << key << "' is not registered in column_names" << endl;
+            return kFailure;
+        }
+    }
+
+    // column_namesにあるが、check_recordにはないものを探す
+    for (const auto &key : column_names)
+    {
+        // check_recordに登録されているかチェック
+        if (check_record.columns.count(key) != 1)
+        {
+            cerr << "key '" << key << "' is not registered in record" << endl;
+            return kFailure;
+        }
+    }
+
     return kSuccess;
 }
 
-int DataBase::deleteRecord()
+// target_recordで指定したRecordを削除する
+int DataBase::deleteRecord(const Record &target_record)
 {
-
+    return deleteRecord(target_record.id);
+}
+// target_recordで指定したRecordを削除する
+int DataBase::deleteRecord(uint64_t id)
+{
+    // target_recordのidから
+    uint32_t target_table_index = primary_index[id];
+    for (int i = target_table_index; i < table_num - 1; ++i)
+    {
+        table[i] = table[i + 1];
+    }
+    --table_num;
+    primary_index.erase(target_table_index);
     return kSuccess;
 }
 
 // table[]の末尾に新しいRecordを追加
 int DataBase::insertRecord(const Record &new_record)
 {
-    for (const auto &[key, value] : new_record.columns)
+    // Recordの制約チェック
+    if (checkRecord(new_record, CHECK_RECORD_OPTION_INSERT) == kFailure)
     {
-        // column_namesに登録されているかチェック
-        if (column_names.count(key) != 1)
-        {
-            cerr << "key '" << key << "' is not registered" << endl;
-            return kFailure;
-        }
+        cerr << FUNCNAME << "(): Failed to insert Record" << endl;
+        return kFailure;
     }
     table[table_num] = new_record;
+    primary_index[new_record.id] = table_num;
     table_num++;
     return kSuccess;
 }
