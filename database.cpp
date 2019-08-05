@@ -24,12 +24,6 @@ using std::vector;
 
 DataBase::DataBase()
 {
-    // Record初期化
-
-    for (int i = 0; i < table_num; ++i)
-    {
-        table[i].id = 0;
-    }
 
     FILE *fp = fopen("data.csv", "r");
     if (fp == NULL)
@@ -129,9 +123,8 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
     table[target_table_index] = update_record_condition;
     return kSuccess;
 }
-// target_record : 変更する前のRecord
-// update_record_condition : 変更後のRecord
-// target_recordを使用して、tableでの添字を取得し、update_record_conditionを代入する
+
+// updateRecord(uint64_t id, const Record &update_record_condition)のオーバーロード
 int DataBase::updateRecord(const Record &target_record, const Record &update_record_condition)
 {
     if (target_record.id == 0)
@@ -141,7 +134,7 @@ int DataBase::updateRecord(const Record &target_record, const Record &update_rec
     return updateRecord(target_record.id, update_record_condition);
 }
 
-// check_recordで与えられたRecordが制約に収まっているかチェックする
+// check_recordで与えられたRecordが制約(database.hppに記載)に収まっているかチェックする
 // option: チェックする内容がRecordのinsertとupdateで微妙に違う 0:insert 1:update
 int DataBase::checkRecord(const Record &check_record, int option)
 {
@@ -177,24 +170,22 @@ int DataBase::checkRecord(const Record &check_record, int option)
     // 制約3: columnに登録されている(map型での)keyの集合は、column_namesに格納されている文字列の集合と等価でなければならない
     // insert, update 両方
 
-    // check_recordにあるが、column_namesにはないものを探す
-    for (const auto &[key, value] : check_record.columns)
+    // 要素数を比べる
+    if (column_names.size() != check_record.columns.size())
     {
-        // column_namesに登録されているかチェック
-        if (column_names.count(key) != 1)
-        {
-            cerr << "key '" << key << "' is not registered in column_names" << endl;
-            return kFailure;
-        }
+        return kFailure;
     }
 
-    // column_namesにあるが、check_recordにはないものを探す
-    for (const auto &key : column_names)
+    // 順番にkeyが一致するかを調べる
+    // 初期化式の中で、for(auto column_names_iterator = column_names.begin(), auto column_iterator = check_record.columns.begin())とするとエラーが出る
+    auto column_names_iterator = column_names.begin();
+    auto column_iterator = check_record.columns.begin();
+    for (;
+         column_names_iterator != column_names.end() && column_iterator != check_record.columns.end();
+         ++column_iterator, ++column_names_iterator)
     {
-        // check_recordに登録されているかチェック
-        if (check_record.columns.count(key) != 1)
+        if (*column_names_iterator != column_iterator->first)
         {
-            cerr << "key '" << key << "' is not registered in record" << endl;
             return kFailure;
         }
     }
@@ -202,25 +193,11 @@ int DataBase::checkRecord(const Record &check_record, int option)
     return kSuccess;
 }
 
-// target_recordで指定したRecordを削除する
+// deleteRecord(uint64_t id)のオーバーロード
 int DataBase::deleteRecord(const Record &target_record)
 {
     return deleteRecord(target_record.id);
 }
-// target_recordで指定したRecordを削除する
-int DataBase::deleteRecord(uint64_t id)
-{
-    // target_recordのidから
-    uint32_t target_table_index = primary_index[id];
-    for (int i = target_table_index; i < table_num - 1; ++i)
-    {
-        table[i] = table[i + 1];
-    }
-    --table_num;
-    primary_index.erase(target_table_index);
-    return kSuccess;
-}
-
 // table[]の末尾に新しいRecordを追加
 int DataBase::insertRecord(const Record &new_record)
 {
@@ -233,6 +210,20 @@ int DataBase::insertRecord(const Record &new_record)
     table[table_num] = new_record;
     primary_index[new_record.id] = table_num;
     table_num++;
+    return kSuccess;
+}
+
+// target_recordで指定したRecordを削除する
+int DataBase::deleteRecord(uint64_t id)
+{
+    // target_recordのidから
+    uint32_t target_table_index = primary_index[id];
+    for (int i = target_table_index; i < table_num - 1; ++i)
+    {
+        table[i] = table[i + 1];
+    }
+    --table_num;
+    primary_index.erase(target_table_index);
     return kSuccess;
 }
 

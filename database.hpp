@@ -18,6 +18,7 @@ public:
      */
     struct Record
     {
+        const static std::int64_t kIdNull = 0;
         std::uint64_t id;
         // column
         // map<string, string>型を使うことで、自由かつ動的にcolumnを扱えるようにする
@@ -25,6 +26,11 @@ public:
         // columns["name"] = "Hoge";
         // columns["age"] = "2020";
         std::map<std::string, std::string> columns;
+
+        Record()
+        {
+            id = kIdNull;
+        }
     };
     const static int table_max_num = 100; // 保持できるRecordの最大値(デバッグ用にpublicにおいているが、privateに移す予定)
     Record table[table_max_num];          // データベースのデータそのもの(デバッグ用にpublicにおいているが、privateに移す予定)
