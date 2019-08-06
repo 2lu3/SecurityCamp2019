@@ -8,6 +8,8 @@
 #include <random>
 #include <set>
 
+// Todo: deleteRecordの際に、primary_indexの更新も必要
+
 class DataBase
 {
 public:
@@ -18,7 +20,8 @@ public:
      */
     struct Record
     {
-        const static std::int64_t kIdNull = 0;
+        const static std::uint64_t kIdNull;
+        const static std::string kValueNull;
         std::uint64_t id;
         // column
         // map<string, string>型を使うことで、自由かつ動的にcolumnを扱えるようにする
@@ -48,7 +51,9 @@ public:
     int createKey(std::string columns[]);                                                 // 未実装
 
     int readRecord(const std::map<std::string, std::string> &target_columns, std::vector<Record> &return_records); // target_columnsで指定した条件に合うRecordを返す
-    int insertRecord(const Record &new_record);                                                                    // new_recordのコピーをtableに追加する
+    int readRecord(std::uint64_t id, Record &return_record);                                                       // idで指定したRecordを返す
+    int insertRecord(Record &new_record);                                                                          // new_recordのコピーをtableに追加する
+    int setId2Record(Record &target_record);                                                                       // target_recordにまだ登録されていないIDを設定する(この関数を作らないと、他の関数の引数にconstをつけることができない)
 
 private:
     // 現在の、tableに格納されているRecordの数

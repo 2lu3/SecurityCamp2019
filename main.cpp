@@ -21,21 +21,23 @@ int main()
     record1.columns["age"] = "12";
     dataBase.insertRecord(record1);
 
-    record2.columns["name"] = "田中";
-    record2.columns["age"] = "24";
-    dataBase.insertRecord(record2);
+    cout << "id " << dataBase.table[0].id << endl;
 
-    // 保存されているかの確認
-    cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
+    // record2.columns["name"] = "田中";
+    // record2.columns["age"] = "24";
+    // dataBase.insertRecord(record2);
 
-    vector<DataBase::Record> vec;   // 条件に合うRecordを格納するための変数
-    map<string, string> conditions; // 条件
-    conditions["name"] = "田中";    // 条件1(nameが田中であるという条件)
-    dataBase.readRecord(conditions, vec);
+    // // 保存されているかの確認
+    // cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
 
-    for (auto &value : vec)
-    {
-        // 条件に合うRecordのageを確認
-        cout << value.columns["age"] << endl;
-    }
+    // vector<DataBase::Record> vec;   // 条件に合うRecordを格納するための変数
+    // map<string, string> conditions; // 条件
+    // conditions["name"] = "田中";    // 条件1(nameが田中であるという条件)
+    // dataBase.readRecord(conditions, vec);
+
+    // for (auto &value : vec)
+    // {
+    //     // 条件に合うRecordのageを確認
+    //     cout << value.columns["age"] << endl;
+    // }
 }

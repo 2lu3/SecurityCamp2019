@@ -22,6 +22,9 @@ using std::vector;
 // 現在の関数名を取得
 #define FUNCNAME __FUNCTION__
 
+const uint64_t DataBase::Record::kIdNull = 0;
+const string DataBase::Record::kValueNull = "";
+
 DataBase::DataBase()
 {
 
@@ -99,6 +102,27 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     return kSuccess;
 }
 
+// Idで指定したRecordをreturn_recordに代入する
+int DataBase::readRecord(uint64_t id, Record &return_record)
+{
+    if (id == return_record.kIdNull)
+    {
+        cerr << FUNCNAME << "(): Error" << endl;
+        return kFailure;
+    }
+
+    if (auto iterator = primary_index.find(id); iterator != end(primary_index))
+    {
+        return_record = table[iterator->second];
+        return kSuccess;
+    }
+    else
+    {
+        cerr << FUNCNAME << "(): Error" << endl;
+        return kFailure;
+    }
+}
+
 // id : 変更する前のRecordのid
 // update_record_condition : 変更後のRecord
 // target_recordを使用して、tableでの添字を取得し、update_record_conditionを代入する
@@ -127,11 +151,26 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
 // updateRecord(uint64_t id, const Record &update_record_condition)のオーバーロード
 int DataBase::updateRecord(const Record &target_record, const Record &update_record_condition)
 {
-    if (target_record.id == 0)
-    {
-        return kFailure;
-    }
     return updateRecord(target_record.id, update_record_condition);
+}
+
+// target_record.idにまだ登録されていないIDを代入する
+int DataBase::setId2Record(Record &target_record)
+{
+    // idがnullか、すでにidが登録されている場合は、idを変更する必要がある
+    if (target_record.id == Record::kIdNull || primary_index.count(target_record.id) == 1)
+    {
+        uint64_t random_id = rnd();
+        // while(idが登録されている || id==null(=0))
+        while (primary_index.count(random_id) == 1 || random_id == Record::kIdNull)
+        {
+            // random_idを更新
+            random_id = rnd();
+        }
+        // まだ登録されていないidを代入
+        target_record.id = random_id;
+    }
+    return kSuccess;
 }
 
 // check_recordで与えられたRecordが制約(database.hppに記載)に収まっているかチェックする
@@ -150,29 +189,18 @@ int DataBase::checkRecord(const Record &check_record, int option)
     }
 
     // 制約2: idは0以外である
-    // insertのときは、自動でidを割り振る
-    if (option == CHECK_RECORD_OPTION_INSERT)
+    if (check_record.id == check_record.kIdNull)
     {
-        int random_id = rnd();
-        while (primary_index.count(random_id) == 1)
-        {
-            random_id = rnd();
-        }
-    }
-    else // option == CHECK_RECORD_OPTION_UPDATE
-    {
-        if (check_record.id == 0)
-        {
-            return kFailure;
-        }
+        return kFailure;
     }
 
     // 制約3: columnに登録されている(map型での)keyの集合は、column_namesに格納されている文字列の集合と等価でなければならない
     // insert, update 両方
 
-    // 要素数を比べる
+    // 最初に要素数を比べる
     if (column_names.size() != check_record.columns.size())
     {
+        // 要素数が違う場合、等価でない
         return kFailure;
     }
 
@@ -184,6 +212,7 @@ int DataBase::checkRecord(const Record &check_record, int option)
          column_names_iterator != column_names.end() && column_iterator != check_record.columns.end();
          ++column_iterator, ++column_names_iterator)
     {
+        // column_namesのkey と columnのkeyが一致していない場合
         if (*column_names_iterator != column_iterator->first)
         {
             return kFailure;
@@ -193,14 +222,12 @@ int DataBase::checkRecord(const Record &check_record, int option)
     return kSuccess;
 }
 
-// deleteRecord(uint64_t id)のオーバーロード
-int DataBase::deleteRecord(const Record &target_record)
-{
-    return deleteRecord(target_record.id);
-}
 // table[]の末尾に新しいRecordを追加
-int DataBase::insertRecord(const Record &new_record)
+// idを割り振るため、const Record &new_recordにしていない
+int DataBase::insertRecord(Record &new_record)
 {
+    // IDをセット
+    setId2Record(new_record);
     // Recordの制約チェック
     if (checkRecord(new_record, CHECK_RECORD_OPTION_INSERT) == kFailure)
     {
@@ -213,11 +240,25 @@ int DataBase::insertRecord(const Record &new_record)
     return kSuccess;
 }
 
+// deleteRecord(uint64_t id)のオーバーロード
+int DataBase::deleteRecord(const Record &target_record)
+{
+    return deleteRecord(target_record.id);
+}
+
 // target_recordで指定したRecordを削除する
 int DataBase::deleteRecord(uint64_t id)
 {
     // target_recordのidから
-    uint32_t target_table_index = primary_index[id];
+    uint32_t target_table_index;
+    if (auto iterator = primary_index.find(id); iterator != end(primary_index))
+    {
+        target_table_index = iterator->second;
+    }
+    else
+    {
+        return kFailure;
+    }
     for (int i = target_table_index; i < table_num - 1; ++i)
     {
         table[i] = table[i + 1];
