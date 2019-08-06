@@ -22,12 +22,8 @@ using std::vector;
 // 現在の関数名を取得
 #define FUNCNAME __FUNCTION__
 
-const uint64_t DataBase::Record::kIdNull = 0;
-const string DataBase::Record::kValueNull = "";
-
 DataBase::DataBase()
 {
-
     FILE *fp = fopen("data.csv", "r");
     if (fp == NULL)
     {
@@ -105,13 +101,13 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
 // Idで指定したRecordをreturn_recordに代入する
 int DataBase::readRecord(uint64_t id, Record &return_record)
 {
-    if (id == return_record.kIdNull)
+    if (id == Record::kIdNull)
     {
         cerr << FUNCNAME << "(): Error" << endl;
         return kFailure;
     }
 
-    if (auto iterator = primary_index.find(id); iterator != end(primary_index))
+    if (auto iterator = primary_index.find(id); iterator != primary_index.end())
     {
         return_record = table[iterator->second];
         return kSuccess;
@@ -128,7 +124,7 @@ int DataBase::readRecord(uint64_t id, Record &return_record)
 // target_recordを使用して、tableでの添字を取得し、update_record_conditionを代入する
 int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
 {
-    // idが変更されていないかチェック
+    // idが変更前と変更後で一致するかチェック
     if (id != update_record_condition.id)
     {
         cerr << FUNCNAME << "(): id of target_record and update_record_condition is not same" << endl;
@@ -142,9 +138,17 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
     }
 
     // idから、primary_indexを使って、table[]の添字を取得
-    uint32_t target_table_index = primary_index[id];
-    // 変更する対象の添字に、update_record_conditionを代入
-    table[target_table_index] = update_record_condition;
+    if (auto target_table_index_iterator = primary_index.find(id); target_table_index_iterator != primary_index.end())
+    {
+        // 変更する対象の添字に、update_record_conditionを代入
+        table[target_table_index_iterator->second];
+        return kSuccess;
+    }
+    else
+    {
+        cerr << FUNCNAME << "(): Error" << endl;
+        return kFailure;
+    }
     return kSuccess;
 }
 
@@ -189,7 +193,7 @@ int DataBase::checkRecord(const Record &check_record, int option)
     }
 
     // 制約2: idは0以外である
-    if (check_record.id == check_record.kIdNull)
+    if (check_record.id == Record::kIdNull)
     {
         return kFailure;
     }
@@ -249,6 +253,10 @@ int DataBase::deleteRecord(const Record &target_record)
 // target_recordで指定したRecordを削除する
 int DataBase::deleteRecord(uint64_t id)
 {
+    if (id == Record::kIdNull)
+    {
+        return kFailure;
+    }
     // target_recordのidから
     uint32_t target_table_index;
     if (auto iterator = primary_index.find(id); iterator != end(primary_index))

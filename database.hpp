@@ -20,18 +20,14 @@ public:
      */
     struct Record
     {
-        const static std::uint64_t kIdNull;
+        const static std::uint64_t kIdNull = 0;
         const static std::string kValueNull;
         std::uint64_t id;
-        // column
-        // map<string, string>型を使うことで、自由かつ動的にcolumnを扱えるようにする
-        // 用例:
-        // columns["name"] = "Hoge";
-        // columns["age"] = "2020";
         std::map<std::string, std::string> columns;
 
         Record()
         {
+            // idはnull値で初期化
             id = kIdNull;
         }
     };
