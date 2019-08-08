@@ -8,7 +8,21 @@
 #include <random>
 #include <set>
 
-// Todo: deleteRecordの際に、primary_indexの更新も必要
+class RedoLog
+{
+public:
+    int addLog(int option, const DataBase::Record changed_record);
+    int writeRecord(const DataBase::Record record);
+
+private:
+    const char log_file_name[10] = "redo.log";
+};
+
+class UndoLog
+{
+public:
+private:
+};
 
 class DataBase
 {
@@ -58,7 +72,7 @@ private:
     std::random_device rnd;
 
     const int CHECK_RECORD_OPTION_INSERT = 0;
-    const int CHECK_RECORD_OPTION_UPDATE = 0;
+    const int CHECK_RECORD_OPTION_UPDATE = 1;
     int checkRecord(const Record &check_record, int option); // Recordが制約に収まっているかチェックする
 
     std::set<std::string> column_names{"name", "age"};
