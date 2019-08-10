@@ -12,10 +12,10 @@ class RedoLog;
 class DataBase
 {
 public:
-    /*  åˆ¶ç´„
-        1: idã¯ãƒ¦ãƒ‹ãƒ¼ã‚¯ã§ã‚ã‚‹
-        2: idã¯0ä»¥å¤–ã§ã‚ã‚‹
-        3: columnsã®keyã¯ã™ã¹ã¦ã®Recordã§å…±é€šã§ãªã‘ã‚Œã°ãªã‚‰ãªã„
+    /*  §–ñ
+        1: id‚Íƒ†ƒj[ƒN‚Å‚ ‚é
+        2: id‚Í0ˆÈŠO‚Å‚ ‚é
+        3: columns‚Ìkey‚Í‚·‚×‚Ä‚ÌRecord‚Å‹¤’Ê‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢
      */
     struct Record
     {
@@ -26,40 +26,40 @@ public:
 
         Record();
     };
-    const static int table_max_num = 100; // ä¿æŒã§ãã‚‹Recordã®æœ€å¤§å€¤(ãƒ‡ãƒãƒƒã‚°ç”¨ã«publicã«ãŠã„ã¦ã„ã‚‹ãŒã€privateã«ç§»ã™äºˆå®š)
-    Record table[table_max_num];          // ãƒ‡ãƒ¼ã‚¿ãƒ™ãƒ¼ã‚¹ã®ãƒ‡ãƒ¼ã‚¿ãã®ã‚‚ã®(ãƒ‡ãƒãƒƒã‚°ç”¨ã«publicã«ãŠã„ã¦ã„ã‚‹ãŒã€privateã«ç§»ã™äºˆå®š)
-    const static int kSuccess = 1;        // é–¢æ•°ã®æˆ»ã‚Šå€¤ã§ã€æˆåŠŸã‚’è¡¨ã™
-    const static int kFailure = 0;        // é–¢æ•°ã®æˆ»ã‚Šå€¤ã§ã€å¤±æ•—ã‚’è¡¨ã™
+    const static int table_max_num = 100; // •Û‚Å‚«‚éRecord‚ÌÅ‘å’l(ƒfƒoƒbƒO—p‚Épublic‚É‚¨‚¢‚Ä‚¢‚é‚ªAprivate‚ÉˆÚ‚·—\’è)
+    Record table[table_max_num];          // ƒf[ƒ^ƒx[ƒX‚Ìƒf[ƒ^‚»‚Ì‚à‚Ì(ƒfƒoƒbƒO—p‚Épublic‚É‚¨‚¢‚Ä‚¢‚é‚ªAprivate‚ÉˆÚ‚·—\’è)
+    const static int kSuccess = 1;        // ŠÖ”‚Ì–ß‚è’l‚ÅA¬Œ÷‚ğ•\‚·
+    const static int kFailure = 0;        // ŠÖ”‚Ì–ß‚è’l‚ÅA¸”s‚ğ•\‚·
     DataBase();
-    int crashRecovery();                                                                  // æœªå®Ÿè£…
-    int begin();                                                                          // æœªå®Ÿè£…
-    int updateRecord(std::uint64_t id, const Record &update_record_condition);            // idã§æŒ‡å®šã—ãŸRecordã‚’update_record_conditionã«ç½®ãæ›ãˆã‚‹
-    int updateRecord(const Record &target_record, const Record &update_record_condition); // target_recordã§æŒ‡å®šã—ãŸRecordã‚’update_record_conditionã«ç½®ãæ›ãˆã‚‹
-    int deleteRecord(const Record &target_record);                                        // target_recordã§æŒ‡å®šã—ãŸRecordã‚’æ¶ˆå»ã™ã‚‹
-    int deleteRecord(std::uint64_t id);                                                   // idã§æŒ‡å®šã—ãŸRecordã‚’æ¶ˆå»ã™ã‚‹
-    int commit();                                                                         // æœªå®Ÿè£…
-    int abort();                                                                          // æœªå®Ÿè£…
-    int createKey(std::string columns[]);                                                 // æœªå®Ÿè£…
+    int crashRecovery();                                                                  // –¢À‘•
+    int begin();                                                                          // –¢À‘•
+    int updateRecord(std::uint64_t id, const Record &update_record_condition);            // id‚Åw’è‚µ‚½Record‚ğupdate_record_condition‚É’u‚«Š·‚¦‚é
+    int updateRecord(const Record &target_record, const Record &update_record_condition); // target_record‚Åw’è‚µ‚½Record‚ğupdate_record_condition‚É’u‚«Š·‚¦‚é
+    int deleteRecord(const Record &target_record);                                        // target_record‚Åw’è‚µ‚½Record‚ğÁ‹‚·‚é
+    int deleteRecord(std::uint64_t id);                                                   // id‚Åw’è‚µ‚½Record‚ğÁ‹‚·‚é
+    int commit();                                                                         // –¢À‘•
+    int abort();                                                                          // –¢À‘•
+    int createKey(std::string columns[]);                                                 // –¢À‘•
 
-    int readRecord(const std::map<std::string, std::string> &target_columns, std::vector<Record> &return_records); // target_columnsã§æŒ‡å®šã—ãŸæ¡ä»¶ã«åˆã†Recordã‚’è¿”ã™
-    int readRecord(std::uint64_t id, Record &return_record);                                                       // idã§æŒ‡å®šã—ãŸRecordã‚’è¿”ã™
-    int insertRecord(Record &new_record);                                                                          // new_recordã®ã‚³ãƒ”ãƒ¼ã‚’tableã«è¿½åŠ ã™ã‚‹
-    int setId2Record(Record &target_record);                                                                       // target_recordã«ã¾ã ç™»éŒ²ã•ã‚Œã¦ã„ãªã„IDã‚’è¨­å®šã™ã‚‹(ã“ã®é–¢æ•°ã‚’ä½œã‚‰ãªã„ã¨ã€ä»–ã®é–¢æ•°ã®å¼•æ•°ã«constã‚’ã¤ã‘ã‚‹ã“ã¨ãŒã§ããªã„)
+    int readRecord(const std::map<std::string, std::string> &target_columns, std::vector<Record> &return_records); // target_columns‚Åw’è‚µ‚½ğŒ‚É‡‚¤Record‚ğ•Ô‚·
+    int readRecord(std::uint64_t id, Record &return_record);                                                       // id‚Åw’è‚µ‚½Record‚ğ•Ô‚·
+    int insertRecord(Record &new_record);                                                                          // new_record‚ÌƒRƒs[‚ğtable‚É’Ç‰Á‚·‚é
+    int setId2Record(Record &target_record);                                                                       // target_record‚É‚Ü‚¾“o˜^‚³‚ê‚Ä‚¢‚È‚¢ID‚ğİ’è‚·‚é(‚±‚ÌŠÖ”‚ğì‚ç‚È‚¢‚ÆA‘¼‚ÌŠÖ”‚Ìˆø”‚Éconst‚ğ‚Â‚¯‚é‚±‚Æ‚ª‚Å‚«‚È‚¢)
 
 private:
     std::unique_ptr<RedoLog> redoLog;
 
-    // ç¾åœ¨ã®ã€tableã«æ ¼ç´ã•ã‚Œã¦ã„ã‚‹Recordã®æ•°
+    // Œ»İ‚ÌAtable‚ÉŠi”[‚³‚ê‚Ä‚¢‚éRecord‚Ì”
     int table_num = 0;
 
     std::random_device rnd;
 
     const int CHECK_RECORD_OPTION_INSERT = 0;
     const int CHECK_RECORD_OPTION_UPDATE = 1;
-    int checkRecord(const Record &check_record, int option); // RecordãŒåˆ¶ç´„ã«åã¾ã£ã¦ã„ã‚‹ã‹ãƒã‚§ãƒƒã‚¯ã™ã‚‹
+    int checkRecord(const Record &check_record, int option); // Record‚ª§–ñ‚Éû‚Ü‚Á‚Ä‚¢‚é‚©ƒ`ƒFƒbƒN‚·‚é
 
     std::set<std::string> column_names{"name", "age"};
-    std::map<std::uint64_t, std::uint32_t> primary_index; // id-tableã®æ·»å­—ã‚’æ ¼ç´ã™ã‚‹
+    std::map<std::uint64_t, std::uint32_t> primary_index; // id-table‚Ì“Yš‚ğŠi”[‚·‚é
 };
 
 class UndoLog
@@ -70,15 +70,15 @@ private:
 class RedoLog
 {
 public:
-    // Insertã‚’è¨˜éŒ²ã™ã‚‹
+    // Insert‚ğ‹L˜^‚·‚é
     int addInsertLog(const DataBase::Record &record, int table_index);
-    // Updateã®å‰å¾Œã®å·®åˆ†ã‚’è¨˜éŒ²ã™ã‚‹ (before_record:å¤‰æ›´å‰, updated_record:å¤‰æ›´å¾Œ)
+    // Update‚Ì‘OŒã‚Ì·•ª‚ğ‹L˜^‚·‚é (before_record:•ÏX‘O, updated_record:•ÏXŒã)
     int addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record);
-    // Deleteã‚’è¨˜éŒ²ã™ã‚‹
+    // Delete‚ğ‹L˜^‚·‚é
     int addDeleteLog(int id);
 
-    const int kSuccess = DataBase::kSuccess; // æˆåŠŸã‚’ç¤ºã™é–¢æ•°ã®æˆ»ã‚Šå€¤
-    const int kFaliure = DataBase::kFailure; // å¤±æ•—ã‚’ç¤ºã™é–¢æ•°ã®æˆ»ã‚Šå€¤
+    const int kSuccess = DataBase::kSuccess; // ¬Œ÷‚ğ¦‚·ŠÖ”‚Ì–ß‚è’l
+    const int kFaliure = DataBase::kFailure; // ¸”s‚ğ¦‚·ŠÖ”‚Ì–ß‚è’l
 
 private:
     const char log_file_name[10] = "redo.log";
