@@ -1,15 +1,19 @@
 #include "database.hpp"
 
+#include <cstdint>
+#include <fstream>
 #include <iostream>
+#include <map>
+#include <string>
 #include <vector>
 
 using std::cerr;
 using std::cout;
 using std::endl;
 using std::extent;
-using std::fscanf;
 using std::int64_t;
 using std::map;
+using std::ofstream;
 using std::string;
 using std::to_string;
 using std::uint32_t;
@@ -17,12 +21,93 @@ using std::uint64_t;
 using std::uint8_t;
 using std::vector;
 
-#define FOR for
-#define rep(i, n) FOR(int64_t i = 0; i < n; ++i)
 // 現在の関数名を取得
 #define FUNCNAME __FUNCTION__
 
-DataBase::DataBase()
+// InsertのRedoLogをredo.logに記録する
+int RedoLog::addInsertLog(const DataBase::Record &record, int table_index)
+{
+    // 完成図 : INSERT(\x1f)tableでの添字(\x1f)id(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1e)
+    // RedoLogの内容
+    string log_message = "INSERT" + '\x1f' + to_string(table_index) + '\x1f' + to_string(record.id);
+    for (const auto &[key, value] : record.columns)
+    {
+        log_message += '\x1f' + key + '\x1f' + value;
+    }
+    log_message += '\x1e';
+
+    // ファイルへの書き込み
+    ofstream file(log_file_name, std::ios::app);
+    if (file)
+    {
+        file << log_message << endl;
+    }
+    else
+    {
+        cerr << FUNCNAME << "(): Error" << endl;
+        return kFaliure;
+    }
+
+    return kSuccess;
+}
+
+// UpdateのRedoLogをredo.logに記録する
+int RedoLog::addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record)
+{
+    // 完成図 : UPDATE(\x1f)id(\x1f)変更するkey(\x1f)変更するvalue(\x1f)...(\x1f)変更するkey(\x1f)変更するvalue(\x1e)
+    // RedoLogの内容
+    string log_message = "UPDATE " + '\x1f' + to_string(updated_record.id);
+    auto before_record_iterator = before_record.columns.begin();
+    auto updated_record_iterator = updated_record.columns.begin();
+    for (;
+         before_record_iterator != before_record.columns.end();
+         ++before_record_iterator, ++updated_record_iterator)
+    {
+        if (before_record_iterator->second != updated_record_iterator->second)
+        {
+            log_message += '\x1f' + updated_record_iterator->first + '\x1f' + updated_record_iterator->second;
+        }
+    }
+    log_message += '\x1e'; // ファイルへの書き込み
+    ofstream file(log_file_name, std::ios::app);
+    if (file)
+    {
+        file << log_message << endl;
+    }
+    else
+    {
+        cerr << FUNCNAME << "(): Error" << endl;
+        return kFaliure;
+    }
+
+    return kSuccess;
+}
+
+int RedoLog::addDeleteLog(int id)
+{
+    // 完成図 : DELETE(\x1f)id(\x1e)
+    string log_message = "DELETE" + '\x1f' + to_string(id) + '\x1e';
+
+    ofstream file(log_file_name, std::ios::app);
+    if (file)
+    {
+        file << log_message << endl;
+    }
+    else
+    {
+        cerr << FUNCNAME << "(): Error" << endl;
+        return kFaliure;
+    }
+    return kSuccess;
+}
+
+DataBase::Record::Record()
+{
+    // idはnull値で初期化
+    id = kIdNull;
+}
+
+DataBase::DataBase() : redoLog(new RedoLog)
 {
     FILE *fp = fopen("data.csv", "r");
     if (fp == NULL)
@@ -39,6 +124,7 @@ int DataBase::begin()
 
 int DataBase::createKey(std::string columns[])
 {
+    cout << columns[0] << endl;
     return kSuccess;
 }
 
@@ -59,7 +145,7 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     // 絞り込んでいる最中/絞り込んだtableの添字の集合
     vector<int> selected_table_index;
     // 最初は、0~レコードの数まですべて
-    rep(i, table_num)
+    for (int i = 0; i < table_num; ++i)
     {
         selected_table_index.emplace_back(i);
     }
@@ -238,8 +324,9 @@ int DataBase::insertRecord(Record &new_record)
         cerr << FUNCNAME << "(): Failed to insert Record" << endl;
         return kFailure;
     }
-    table[table_num] = new_record;
-    primary_index[new_record.id] = table_num;
+    redoLog->addInsertLog(new_record, table_num);
+    // table[table_num] = new_record;
+    // primary_index[new_record.id] = table_num;
     table_num++;
     return kSuccess;
 }

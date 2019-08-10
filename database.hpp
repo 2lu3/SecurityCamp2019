@@ -2,27 +2,12 @@
 #define SECURITYCAMP2019_DATABASE_HPP_
 
 #include <cstdint>
-#include <string>
-#include <iostream>
 #include <map>
+#include <memory>
 #include <random>
 #include <set>
 
-class RedoLog
-{
-public:
-    int addLog(int option, const DataBase::Record changed_record);
-    int writeRecord(const DataBase::Record record);
-
-private:
-    const char log_file_name[10] = "redo.log";
-};
-
-class UndoLog
-{
-public:
-private:
-};
+class RedoLog;
 
 class DataBase
 {
@@ -39,11 +24,7 @@ public:
         std::uint64_t id;
         std::map<std::string, std::string> columns;
 
-        Record()
-        {
-            // idはnull値で初期化
-            id = kIdNull;
-        }
+        Record();
     };
     const static int table_max_num = 100; // 保持できるRecordの最大値(デバッグ用にpublicにおいているが、privateに移す予定)
     Record table[table_max_num];          // データベースのデータそのもの(デバッグ用にpublicにおいているが、privateに移す予定)
@@ -66,6 +47,8 @@ public:
     int setId2Record(Record &target_record);                                                                       // target_recordにまだ登録されていないIDを設定する(この関数を作らないと、他の関数の引数にconstをつけることができない)
 
 private:
+    std::unique_ptr<RedoLog> redoLog;
+
     // 現在の、tableに格納されているRecordの数
     int table_num = 0;
 
@@ -77,6 +60,28 @@ private:
 
     std::set<std::string> column_names{"name", "age"};
     std::map<std::uint64_t, std::uint32_t> primary_index; // id-tableの添字を格納する
+};
+
+class UndoLog
+{
+public:
+private:
+};
+class RedoLog
+{
+public:
+    // Insertを記録する
+    int addInsertLog(const DataBase::Record &record, int table_index);
+    // Updateの前後の差分を記録する (before_record:変更前, updated_record:変更後)
+    int addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record);
+    // Deleteを記録する
+    int addDeleteLog(int id);
+
+    const int kSuccess = DataBase::kSuccess; // 成功を示す関数の戻り値
+    const int kFaliure = DataBase::kFailure; // 失敗を示す関数の戻り値
+
+private:
+    const char log_file_name[10] = "redo.log";
 };
 
 #endif //SECURITYCAMP2019_DATABASE_HPP_
