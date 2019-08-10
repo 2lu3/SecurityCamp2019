@@ -71,11 +71,11 @@ class RedoLog
 {
 public:
     // Insertを記録する
-    int addInsertLog(const DataBase::Record &record, int table_index);
+    int addInsertLog(std::uint32_t table_index, const DataBase::Record &record);
     // Updateの前後の差分を記録する (before_record:変更前, updated_record:変更後)
-    int addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record);
+    int addUpdateLog(std::uint32_t table_index, const DataBase::Record &before_record, const DataBase::Record &updated_record);
     // Deleteを記録する
-    int addDeleteLog(int id);
+    int addDeleteLog(std::uint64_t id);
 
     const int kSuccess = DataBase::kSuccess; // 成功を示す関数の戻り値
     const int kFaliure = DataBase::kFailure; // 失敗を示す関数の戻り値

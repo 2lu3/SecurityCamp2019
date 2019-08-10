@@ -25,11 +25,12 @@ using std::vector;
 #define FUNCNAME __FUNCTION__
 
 // Insert‚ÌRedoLog‚ğredo.log‚É‹L˜^‚·‚é
-int RedoLog::addInsertLog(const DataBase::Record &record, int table_index)
+int RedoLog::addInsertLog(uint32_t table_index, const DataBase::Record &record)
 {
     // Š®¬} : INSERT(\x1f)table‚Å‚Ì“Yš(\x1f)id(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1e)
     // RedoLog‚Ì“à—e
-    string log_message = "INSERT" + '\x1f' + to_string(table_index) + '\x1f' + to_string(record.id);
+    string log_message = "INSERT\x1f" + to_string(table_index) + '\x1f' + to_string(record.id);
+    cout << "first " << log_message;
     for (const auto &[key, value] : record.columns)
     {
         log_message += '\x1f' + key + '\x1f' + value;
@@ -41,6 +42,7 @@ int RedoLog::addInsertLog(const DataBase::Record &record, int table_index)
     if (file)
     {
         file << log_message << endl;
+        cout << log_message << endl;
     }
     else
     {
@@ -52,11 +54,11 @@ int RedoLog::addInsertLog(const DataBase::Record &record, int table_index)
 }
 
 // Update‚ÌRedoLog‚ğredo.log‚É‹L˜^‚·‚é
-int RedoLog::addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record)
+int RedoLog::addUpdateLog(uint32_t table_index, const DataBase::Record &before_record, const DataBase::Record &updated_record)
 {
-    // Š®¬} : UPDATE(\x1f)id(\x1f)•ÏX‚·‚ékey(\x1f)•ÏX‚·‚évalue(\x1f)...(\x1f)•ÏX‚·‚ékey(\x1f)•ÏX‚·‚évalue(\x1e)
+    // Š®¬} : UPDATE(\x1f)table‚Å‚Ì“Yš(\x1f)id(\x1f)•ÏX‚·‚ékey(\x1f)•ÏX‚·‚évalue(\x1f)...(\x1f)•ÏX‚·‚ékey(\x1f)•ÏX‚·‚évalue(\x1e)
     // RedoLog‚Ì“à—e
-    string log_message = "UPDATE " + '\x1f' + to_string(updated_record.id);
+    string log_message = "UPDATE\x1f" + to_string(table_index) + '\x1f' + to_string(updated_record.id);
     auto before_record_iterator = before_record.columns.begin();
     auto updated_record_iterator = updated_record.columns.begin();
     for (;
@@ -83,10 +85,10 @@ int RedoLog::addUpdateLog(const DataBase::Record &before_record, const DataBase:
     return kSuccess;
 }
 
-int RedoLog::addDeleteLog(int id)
+int RedoLog::addDeleteLog(uint64_t id)
 {
     // Š®¬} : DELETE(\x1f)id(\x1e)
-    string log_message = "DELETE" + '\x1f' + to_string(id) + '\x1e';
+    string log_message = "DELETE\x1f" + to_string(id) + '\x1e';
 
     ofstream file(log_file_name, std::ios::app);
     if (file)
@@ -227,7 +229,8 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
     if (auto target_table_index_iterator = primary_index.find(id); target_table_index_iterator != primary_index.end())
     {
         // •ÏX‚·‚é‘ÎÛ‚Ì“Yš‚ÉAupdate_record_condition‚ğ‘ã“ü
-        table[target_table_index_iterator->second];
+        redoLog->addUpdateLog(target_table_index_iterator->second, table[target_table_index_iterator->second], update_record_condition);
+        // table[target_table_index_iterator->second] = update_record_condition;
         return kSuccess;
     }
     else
@@ -324,9 +327,9 @@ int DataBase::insertRecord(Record &new_record)
         cerr << FUNCNAME << "(): Failed to insert Record" << endl;
         return kFailure;
     }
-    redoLog->addInsertLog(new_record, table_num);
-    // table[table_num] = new_record;
-    // primary_index[new_record.id] = table_num;
+    redoLog->addInsertLog(table_num, new_record);
+    table[table_num] = new_record;
+    primary_index[new_record.id] = table_num;
     table_num++;
     return kSuccess;
 }
@@ -344,6 +347,8 @@ int DataBase::deleteRecord(uint64_t id)
     {
         return kFailure;
     }
+
+    redoLog->addDeleteLog(id);
     // target_record‚Ìid‚©‚ç
     uint32_t target_table_index;
     if (auto iterator = primary_index.find(id); iterator != end(primary_index))
