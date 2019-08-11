@@ -250,7 +250,7 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
     if (auto target_table_index_iterator = primary_index.find(id); target_table_index_iterator != primary_index.end())
     {
         // 変更する対象の添字に、update_record_conditionを代入
-        redoLog->addUpdateLog(target_table_index_iterator->second, table[target_table_index_iterator->second], update_record_condition);
+        redoLog->addUpdateLog(table[target_table_index_iterator->second], update_record_condition);
         // table[target_table_index_iterator->second] = update_record_condition;
         return kSuccess;
     }
@@ -259,7 +259,6 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
         cerr << FUNCNAME << "(): Error" << endl;
         return kFailure;
     }
-    return kSuccess;
 }
 
 // updateRecord(uint64_t id, const Record &update_record_condition)のオーバーロード
@@ -293,14 +292,15 @@ int DataBase::checkRecord(const Record &check_record, int option)
 {
     // 制約1: idはユニークである
     // insertのときのみ
-    if (option == CHECK_RECORD_OPTION_INSERT)
-    {
-        // idがすでに登録されている場合
-        if (primary_index.count(check_record.id) != 0)
-        {
-            return kFailure;
-        }
-    }
+    // 追記 : RedoLogの実装で必要なくなった
+    // if (option == CHECK_RECORD_OPTION_INSERT)
+    // {
+    //     // idがすでに登録されている場合
+    //     if (primary_index.count(check_record.id) != 0)
+    //     {
+    //         return kFailure;
+    //     }
+    // }
 
     // 制約2: idは0以外である
     if (check_record.id == Record::kIdNull)
@@ -341,17 +341,17 @@ int DataBase::checkRecord(const Record &check_record, int option)
 int DataBase::insertRecord(Record &new_record)
 {
     // IDをセット
-    setId2Record(new_record);
+    // setId2Record(new_record);
     // Recordの制約チェック
     if (checkRecord(new_record, CHECK_RECORD_OPTION_INSERT) == kFailure)
     {
         cerr << FUNCNAME << "(): Failed to insert Record" << endl;
         return kFailure;
     }
-    redoLog->addInsertLog(table_num, new_record);
+    redoLog->addInsertLog(new_record);
     table[table_num] = new_record;
-    primary_index[new_record.id] = table_num;
-    table_num++;
+    // primary_index[new_record.id] = table_num;
+    // table_num++;
     return kSuccess;
 }
 
@@ -366,26 +366,29 @@ int DataBase::deleteRecord(uint64_t id)
 {
     if (id == Record::kIdNull)
     {
+        cerr << FUNCNAME << "(): Error" << endl;
         return kFailure;
     }
 
-    redoLog->addDeleteLog(id);
-    // target_recordのidから
+    // target_recordのidからprimary_indexを使用して
     uint32_t target_table_index;
     if (auto iterator = primary_index.find(id); iterator != end(primary_index))
     {
-        target_table_index = iterator->second;
+        redoLog->addDeleteLog(id);
+        // target_table_index = iterator->second;
     }
     else
     {
+        // そのidのrecordは存在しない
+        cerr << FUNCNAME << "(): Error" << endl;
         return kFailure;
     }
-    for (int i = target_table_index; i < table_num - 1; ++i)
-    {
-        table[i] = table[i + 1];
-    }
-    --table_num;
-    primary_index.erase(target_table_index);
+    // for (int i = target_table_index; i < table_num - 1; ++i)
+    // {
+    //     table[i] = table[i + 1];
+    // }
+    // --table_num;
+    // primary_index.erase(target_table_index);
     return kSuccess;
 }
 
