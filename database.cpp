@@ -28,7 +28,6 @@ using std::vector;
 int RedoLog::addInsertLog(uint32_t table_index, const DataBase::Record &record)
 {
     // Š®¬} : INSERT(\x1f)table‚Å‚Ì“Yš(\x1f)id(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1e)
-    // RedoLog‚Ì“à—e
     string log_message = "INSERT\x1f" + to_string(table_index) + '\x1f' + to_string(record.id);
     cout << "first " << log_message;
     for (const auto &[key, value] : record.columns)
