@@ -251,9 +251,9 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
     if (auto iterator = primary_index.find(id); iterator != primary_index.end())
     {
         // 変更する対象の添字に、update_record_conditionを代入
-        redoLog->addUpdateLog(table[iterator->second], update_record_condition);
+        return redoLog->addUpdateLog(table[iterator->second], update_record_condition);
         // table[target_table_index_iterator->second] = update_record_condition;
-        return kSuccess;
+        // return kSuccess;
     }
     else
     {
@@ -353,11 +353,11 @@ int DataBase::insertRecord(Record &new_record)
         cerr << FUNCNAME << "(): Failed to insert Record" << endl;
         return kFailure;
     }
-    redoLog->addInsertLog(new_record);
+    return redoLog->addInsertLog(new_record);
     // table[table_num] = new_record;
     // primary_index[new_record.id] = table_num;
     // table_num++;
-    return kSuccess;
+    // return kSuccess;
 }
 
 // deleteRecord(uint64_t id)のオーバーロード
@@ -379,7 +379,7 @@ int DataBase::deleteRecord(uint64_t id)
     uint32_t target_table_index;
     if (auto iterator = primary_index.find(id); iterator != end(primary_index))
     {
-        redoLog->addDeleteLog(id);
+        return redoLog->addDeleteLog(id);
         // target_table_index = iterator->second;
     }
     else
