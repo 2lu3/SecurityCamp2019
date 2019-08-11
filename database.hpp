@@ -82,9 +82,9 @@ public:
     // target_recordにまだ登録されていないIDを設定する
     int setId2Record(Record &target_record);
 
-private:
     std::unique_ptr<RedoLog> redoLog;
 
+private:
     // 現在の、tableに格納されているRecordの数
     int table_num = 0;
 
@@ -117,8 +117,10 @@ public:
     // Deleteを記録する
     int addDeleteLog(std::uint64_t id);
 
-    const int kSuccess = DataBase::kSuccess; // 成功を示す関数の戻り値
-    const int kFaliure = DataBase::kFailure; // 失敗を示す関数の戻り値
+    int readRedoLog(std::string &message);
+
+    const static int kSuccess = DataBase::kSuccess; // 成功を示す関数の戻り値
+    const static int kFaliure = DataBase::kFailure; // 失敗を示す関数の戻り値
 
 private:
     const char log_file_name[10] = "redo.log";

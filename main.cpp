@@ -13,7 +13,7 @@ using std::vector;
 
 int main()
 {
-    system("chcp 932");
+    system("chcp 65001");
     DataBase dataBase;
     DataBase::Record record1, record2;
 
@@ -29,6 +29,9 @@ int main()
     record2.id = record1.id;
     dataBase.updateRecord(record1, record2);
     dataBase.deleteRecord(record1);
+
+    std::string message;
+    dataBase.redoLog->readRedoLog(message);
 
     // 保存されているかの確認
     // cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
