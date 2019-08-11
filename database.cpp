@@ -28,7 +28,7 @@ using std::vector;
 int RedoLog::addInsertLog(const DataBase::Record &record)
 {
     // 完成図 : INSERT(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1e)
-    string log_message = "INSERT\x1f";
+    string log_message = "INSERT";
 
     for (const auto &[key, value] : record.columns)
     {
