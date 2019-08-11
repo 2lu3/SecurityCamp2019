@@ -243,14 +243,15 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
     // update_record_conditionが制約に反していないかチェックする
     if (checkRecord(update_record_condition, CHECK_RECORD_OPTION_UPDATE) == kFailure)
     {
+        cerr << FUNCNAME << "(): Error" << endl;
         return kFailure;
     }
 
     // idから、primary_indexを使って、table[]の添字を取得
-    if (auto target_table_index_iterator = primary_index.find(id); target_table_index_iterator != primary_index.end())
+    if (auto iterator = primary_index.find(id); iterator != primary_index.end())
     {
         // 変更する対象の添字に、update_record_conditionを代入
-        redoLog->addUpdateLog(table[target_table_index_iterator->second], update_record_condition);
+        redoLog->addUpdateLog(table[iterator->second], update_record_condition);
         // table[target_table_index_iterator->second] = update_record_condition;
         return kSuccess;
     }
@@ -303,9 +304,13 @@ int DataBase::checkRecord(const Record &check_record, int option)
     // }
 
     // 制約2: idは0以外である
-    if (check_record.id == Record::kIdNull)
+    // Insertのときは後でIDを振るのでパス
+    if (option != CHECK_RECORD_OPTION_INSERT)
     {
-        return kFailure;
+        if (check_record.id == Record::kIdNull)
+        {
+            return kFailure;
+        }
     }
 
     // 制約3: columnに登録されている(map型での)keyの集合は、column_namesに格納されている文字列の集合と等価でなければならない
@@ -349,7 +354,7 @@ int DataBase::insertRecord(Record &new_record)
         return kFailure;
     }
     redoLog->addInsertLog(new_record);
-    table[table_num] = new_record;
+    // table[table_num] = new_record;
     // primary_index[new_record.id] = table_num;
     // table_num++;
     return kSuccess;
