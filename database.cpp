@@ -41,6 +41,11 @@ int RedoLog::addInsertLog(const DataBase::Record &record)
     if (file)
     {
         file << log_message << endl;
+        if (!file)
+        {
+            cerr << FUNCNAME << "(): Error" << endl;
+            return kFaliure;
+        }
     }
     else
     {
@@ -80,6 +85,11 @@ int RedoLog::addUpdateLog(const DataBase::Record &before_record, const DataBase:
     if (file)
     {
         file << log_message << endl;
+        if (!file)
+        {
+            cerr << FUNCNAME << "(): Error" << endl;
+            return kFaliure;
+        }
     }
     else
     {
@@ -100,6 +110,11 @@ int RedoLog::addDeleteLog(uint64_t id)
     if (file)
     {
         file << log_message << endl;
+        if (!file)
+        {
+            cerr << FUNCNAME << "(): Error" << endl;
+            return kFaliure;
+        }
     }
     else
     {
