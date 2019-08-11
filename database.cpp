@@ -25,11 +25,11 @@ using std::vector;
 #define FUNCNAME __FUNCTION__
 
 // InsertのRedoLogをredo.logに記録する
-int RedoLog::addInsertLog(uint32_t table_index, const DataBase::Record &record)
+int RedoLog::addInsertLog(const DataBase::Record &record)
 {
-    // 完成図 : INSERT(\x1f)tableでの添字(\x1f)id(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1e)
-    string log_message = "INSERT\x1f" + to_string(table_index) + '\x1f' + to_string(record.id);
-    cout << "first " << log_message;
+    // 完成図 : INSERT(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1e)
+    string log_message = "INSERT\x1f";
+
     for (const auto &[key, value] : record.columns)
     {
         log_message += '\x1f' + key + '\x1f' + value;
@@ -41,7 +41,6 @@ int RedoLog::addInsertLog(uint32_t table_index, const DataBase::Record &record)
     if (file)
     {
         file << log_message << endl;
-        cout << log_message << endl;
     }
     else
     {
@@ -53,23 +52,30 @@ int RedoLog::addInsertLog(uint32_t table_index, const DataBase::Record &record)
 }
 
 // UpdateのRedoLogをredo.logに記録する
-int RedoLog::addUpdateLog(uint32_t table_index, const DataBase::Record &before_record, const DataBase::Record &updated_record)
+int RedoLog::addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record)
 {
-    // 完成図 : UPDATE(\x1f)tableでの添字(\x1f)id(\x1f)変更するkey(\x1f)変更するvalue(\x1f)...(\x1f)変更するkey(\x1f)変更するvalue(\x1e)
+    // 完成図 : UPDATE(\x1f)id(\x1f)変更するkey(\x1f)変更するvalue(\x1f)...(\x1f)変更するkey(\x1f)変更するvalue(\x1e)
     // RedoLogの内容
-    string log_message = "UPDATE\x1f" + to_string(table_index) + '\x1f' + to_string(updated_record.id);
+    string log_message = "UPDATE\x1f" + to_string(updated_record.id);
+
+    // before_recordとupdate_recordのcolumnのvalueを順番に比較する
     auto before_record_iterator = before_record.columns.begin();
     auto updated_record_iterator = updated_record.columns.begin();
     for (;
          before_record_iterator != before_record.columns.end();
          ++before_record_iterator, ++updated_record_iterator)
     {
+        // keyが同じであることは、updateRecordで確認済み
         if (before_record_iterator->second != updated_record_iterator->second)
         {
+            // valueが一致しない場合、変更されている
+            // log_message += (\x1f)key(\x1f)value
             log_message += '\x1f' + updated_record_iterator->first + '\x1f' + updated_record_iterator->second;
         }
     }
-    log_message += '\x1e'; // ファイルへの書き込み
+    log_message += '\x1e';
+
+    // ファイルへの書き込み
     ofstream file(log_file_name, std::ios::app);
     if (file)
     {
@@ -89,6 +95,7 @@ int RedoLog::addDeleteLog(uint64_t id)
     // 完成図 : DELETE(\x1f)id(\x1e)
     string log_message = "DELETE\x1f" + to_string(id) + '\x1e';
 
+    // ファイルへの書き込み
     ofstream file(log_file_name, std::ios::app);
     if (file)
     {
