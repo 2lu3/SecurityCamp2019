@@ -17,12 +17,12 @@ int main()
     DataBase dataBase;
     DataBase::Record record1, record2;
 
-    // Record‚Ì’Ç‰Á(x 2)
-    record1.columns["name"] = "R“c";
+    // Recordã®è¿½åŠ (x 2)
+    record1.columns["name"] = "å±±ç”°";
     record1.columns["age"] = "12";
     dataBase.insertRecord(record1);
 
-    record2.columns["name"] = "“c’†";
+    record2.columns["name"] = "ç”°ä¸­";
     record2.columns["age"] = "24";
     dataBase.insertRecord(record2);
 
@@ -30,17 +30,17 @@ int main()
     dataBase.updateRecord(record1, record2);
     dataBase.deleteRecord(record1);
 
-    // •Û‘¶‚³‚ê‚Ä‚¢‚é‚©‚ÌŠm”F
+    // ä¿å­˜ã•ã‚Œã¦ã„ã‚‹ã‹ã®ç¢ºèª
     // cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
 
-    // vector<DataBase::Record> vec;   // ğŒ‚É‡‚¤Record‚ğŠi”[‚·‚é‚½‚ß‚Ì•Ï”
-    // map<string, string> conditions; // ğŒ
-    // conditions["name"] = "“c’†";    // ğŒ1(name‚ª“c’†‚Å‚ ‚é‚Æ‚¢‚¤ğŒ)
+    // vector<DataBase::Record> vec;   // æ¡ä»¶ã«åˆã†Recordã‚’æ ¼ç´ã™ã‚‹ãŸã‚ã®å¤‰æ•°
+    // map<string, string> conditions; // æ¡ä»¶
+    // conditions["name"] = "ç”°ä¸­";    // æ¡ä»¶1(nameãŒç”°ä¸­ã§ã‚ã‚‹ã¨ã„ã†æ¡ä»¶)
     // dataBase.readRecord(conditions, vec);
 
     // for (auto &value : vec)
     // {
-    //     // ğŒ‚É‡‚¤Record‚Ìage‚ğŠm”F
+    //     // æ¡ä»¶ã«åˆã†Recordã®ageã‚’ç¢ºèª
     //     cout << value.columns["age"] << endl;
     // }
 }

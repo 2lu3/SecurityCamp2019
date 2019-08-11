@@ -21,13 +21,13 @@ using std::uint64_t;
 using std::uint8_t;
 using std::vector;
 
-// Œ»İ‚ÌŠÖ”–¼‚ğæ“¾
+// ç¾åœ¨ã®é–¢æ•°åã‚’å–å¾—
 #define FUNCNAME __FUNCTION__
 
-// Insert‚ÌRedoLog‚ğredo.log‚É‹L˜^‚·‚é
+// Insertã®RedoLogã‚’redo.logã«è¨˜éŒ²ã™ã‚‹
 int RedoLog::addInsertLog(uint32_t table_index, const DataBase::Record &record)
 {
-    // Š®¬} : INSERT(\x1f)table‚Å‚Ì“Yš(\x1f)id(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1e)
+    // å®Œæˆå›³ : INSERT(\x1f)tableã§ã®æ·»å­—(\x1f)id(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1e)
     string log_message = "INSERT\x1f" + to_string(table_index) + '\x1f' + to_string(record.id);
     cout << "first " << log_message;
     for (const auto &[key, value] : record.columns)
@@ -36,7 +36,7 @@ int RedoLog::addInsertLog(uint32_t table_index, const DataBase::Record &record)
     }
     log_message += '\x1e';
 
-    // ƒtƒ@ƒCƒ‹‚Ö‚Ì‘‚«‚İ
+    // ãƒ•ã‚¡ã‚¤ãƒ«ã¸ã®æ›¸ãè¾¼ã¿
     ofstream file(log_file_name, std::ios::app);
     if (file)
     {
@@ -52,11 +52,11 @@ int RedoLog::addInsertLog(uint32_t table_index, const DataBase::Record &record)
     return kSuccess;
 }
 
-// Update‚ÌRedoLog‚ğredo.log‚É‹L˜^‚·‚é
+// Updateã®RedoLogã‚’redo.logã«è¨˜éŒ²ã™ã‚‹
 int RedoLog::addUpdateLog(uint32_t table_index, const DataBase::Record &before_record, const DataBase::Record &updated_record)
 {
-    // Š®¬} : UPDATE(\x1f)table‚Å‚Ì“Yš(\x1f)id(\x1f)•ÏX‚·‚ékey(\x1f)•ÏX‚·‚évalue(\x1f)...(\x1f)•ÏX‚·‚ékey(\x1f)•ÏX‚·‚évalue(\x1e)
-    // RedoLog‚Ì“à—e
+    // å®Œæˆå›³ : UPDATE(\x1f)tableã§ã®æ·»å­—(\x1f)id(\x1f)å¤‰æ›´ã™ã‚‹key(\x1f)å¤‰æ›´ã™ã‚‹value(\x1f)...(\x1f)å¤‰æ›´ã™ã‚‹key(\x1f)å¤‰æ›´ã™ã‚‹value(\x1e)
+    // RedoLogã®å†…å®¹
     string log_message = "UPDATE\x1f" + to_string(table_index) + '\x1f' + to_string(updated_record.id);
     auto before_record_iterator = before_record.columns.begin();
     auto updated_record_iterator = updated_record.columns.begin();
@@ -69,7 +69,7 @@ int RedoLog::addUpdateLog(uint32_t table_index, const DataBase::Record &before_r
             log_message += '\x1f' + updated_record_iterator->first + '\x1f' + updated_record_iterator->second;
         }
     }
-    log_message += '\x1e'; // ƒtƒ@ƒCƒ‹‚Ö‚Ì‘‚«‚İ
+    log_message += '\x1e'; // ãƒ•ã‚¡ã‚¤ãƒ«ã¸ã®æ›¸ãè¾¼ã¿
     ofstream file(log_file_name, std::ios::app);
     if (file)
     {
@@ -86,7 +86,7 @@ int RedoLog::addUpdateLog(uint32_t table_index, const DataBase::Record &before_r
 
 int RedoLog::addDeleteLog(uint64_t id)
 {
-    // Š®¬} : DELETE(\x1f)id(\x1e)
+    // å®Œæˆå›³ : DELETE(\x1f)id(\x1e)
     string log_message = "DELETE\x1f" + to_string(id) + '\x1e';
 
     ofstream file(log_file_name, std::ios::app);
@@ -104,7 +104,7 @@ int RedoLog::addDeleteLog(uint64_t id)
 
 DataBase::Record::Record()
 {
-    // id‚Ínull’l‚Å‰Šú‰»
+    // idã¯nullå€¤ã§åˆæœŸåŒ–
     id = kIdNull;
 }
 
@@ -113,7 +113,7 @@ DataBase::DataBase() : redoLog(new RedoLog)
     FILE *fp = fopen("data.csv", "r");
     if (fp == NULL)
     {
-        cout << "ƒtƒ@ƒCƒ‹‚ªŠJ‚«‚Ü‚¹‚ñ" << endl;
+        cout << "ãƒ•ã‚¡ã‚¤ãƒ«ãŒé–‹ãã¾ã›ã‚“" << endl;
     }
     fclose(fp);
 }
@@ -130,54 +130,54 @@ int DataBase::createKey(std::string columns[])
 }
 
 /*
-    target_columns‚Åw’è‚µ‚½ğŒ‚É‚ ‚¤Record(•¡”‰Â)‚ğ•Ô‚·ŠÖ”
-    —p—á:
+    target_columnsã§æŒ‡å®šã—ãŸæ¡ä»¶ã«ã‚ã†Record(è¤‡æ•°å¯)ã‚’è¿”ã™é–¢æ•°
+    ç”¨ä¾‹:
     map<string, string> mp;
-    mp["name"] = "R“c";
-    mp["gender"] = "male"; // ğŒ‚ğw’è
-    vector<Record> record_receiver; // Record‚ğó‚¯æ‚é‚½‚ß‚Ìvector
+    mp["name"] = "å±±ç”°";
+    mp["gender"] = "male"; // æ¡ä»¶ã‚’æŒ‡å®š
+    vector<Record> record_receiver; // Recordã‚’å—ã‘å–ã‚‹ãŸã‚ã®vector
     dataBase.readRecord(mp, record_receiver);
     for(auto &value : vec) {
-        // value‚ÍAmp‚Åw’è‚µ‚½ğŒ‚É‡‚¤Record
+        // valueã¯ã€mpã§æŒ‡å®šã—ãŸæ¡ä»¶ã«åˆã†Record
     }
 */
 int DataBase::readRecord(const map<string, string> &target_columns, vector<Record> &return_records)
 {
-    // i‚è‚ñ‚Å‚¢‚éÅ’†/i‚è‚ñ‚¾table‚Ì“Yš‚ÌW‡
+    // çµã‚Šè¾¼ã‚“ã§ã„ã‚‹æœ€ä¸­/çµã‚Šè¾¼ã‚“ã tableã®æ·»å­—ã®é›†åˆ
     vector<int> selected_table_index;
-    // Å‰‚ÍA0~ƒŒƒR[ƒh‚Ì”‚Ü‚Å‚·‚×‚Ä
+    // æœ€åˆã¯ã€0~ãƒ¬ã‚³ãƒ¼ãƒ‰ã®æ•°ã¾ã§ã™ã¹ã¦
     for (int i = 0; i < table_num; ++i)
     {
         selected_table_index.emplace_back(i);
     }
 
-    // •¡”‚ÌğŒ‚ğA‡”Ô‚ÉŠm”F‚µ‚Ä‚¢‚­
+    // è¤‡æ•°ã®æ¡ä»¶ã‚’ã€é †ç•ªã«ç¢ºèªã—ã¦ã„ã
     for (const auto &[column_name, column_value] : target_columns)
     {
-        // column_name‚ª‘¶İ‚·‚é‚©ƒ`ƒFƒbƒN
-        // column_names‚É‚ÍAŒ»İg‚í‚ê‚Ä‚¢‚écolumn‚Ì–¼‘O‚ª‚·‚×‚ÄŠi”[‚³‚ê‚Ä‚¢‚é
+        // column_nameãŒå­˜åœ¨ã™ã‚‹ã‹ãƒã‚§ãƒƒã‚¯
+        // column_namesã«ã¯ã€ç¾åœ¨ä½¿ã‚ã‚Œã¦ã„ã‚‹columnã®åå‰ãŒã™ã¹ã¦æ ¼ç´ã•ã‚Œã¦ã„ã‚‹
         if (column_names.count(column_name) == 1)
         {
-            // ğŒ‚É‚ ‚í‚È‚¢Record‚Ì“Yš‚ğselected_table_index‚©‚çÁ‹‚µ‚Ä‚¢‚­
+            // æ¡ä»¶ã«ã‚ã‚ãªã„Recordã®æ·»å­—ã‚’selected_table_indexã‹ã‚‰æ¶ˆå»ã—ã¦ã„ã
             for (auto it = selected_table_index.begin(); it != selected_table_index.end(); ++it)
             {
-                // ‚à‚µA’l‚ªˆê’v‚µ‚È‚¢ê‡‚ÍAğŒ‚É‡‚Á‚Ä‚¢‚È‚¢‚Æ‚¢‚¤‚±‚Æ
+                // ã‚‚ã—ã€å€¤ãŒä¸€è‡´ã—ãªã„å ´åˆã¯ã€æ¡ä»¶ã«åˆã£ã¦ã„ãªã„ã¨ã„ã†ã“ã¨
                 if (table[*it].columns[column_name] != column_value)
                 {
-                    // selected_table_index‚©‚çíœ
+                    // selected_table_indexã‹ã‚‰å‰Šé™¤
                     selected_table_index.erase(it);
                 }
             }
         }
         else
         {
-            // ‘¶İ‚µ‚È‚¢column‚Ì–¼‘O‚ğw’è‚³‚ê‚½ê‡
+            // å­˜åœ¨ã—ãªã„columnã®åå‰ã‚’æŒ‡å®šã•ã‚ŒãŸå ´åˆ
             cerr << "Error: " << FUNCNAME << "(): there is no column_name '" << column_name << "' in column_names" << endl;
             return kFailure;
         }
     }
 
-    // return_records‚ÉAi‚è‚ñ‚¾Record‚ğ‘ã“ü‚µ‚Ä‚¢‚­
+    // return_recordsã«ã€çµã‚Šè¾¼ã‚“ã Recordã‚’ä»£å…¥ã—ã¦ã„ã
     for (auto it = selected_table_index.begin(); it != selected_table_index.end(); ++it)
     {
         return_records.emplace_back(table[*it]);
@@ -185,7 +185,7 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     return kSuccess;
 }
 
-// Id‚Åw’è‚µ‚½Record‚ğreturn_record‚É‘ã“ü‚·‚é
+// Idã§æŒ‡å®šã—ãŸRecordã‚’return_recordã«ä»£å…¥ã™ã‚‹
 int DataBase::readRecord(uint64_t id, Record &return_record)
 {
     if (id == Record::kIdNull)
@@ -206,28 +206,28 @@ int DataBase::readRecord(uint64_t id, Record &return_record)
     }
 }
 
-// id : •ÏX‚·‚é‘O‚ÌRecord‚Ìid
-// update_record_condition : •ÏXŒã‚ÌRecord
-// target_record‚ğg—p‚µ‚ÄAtable‚Å‚Ì“Yš‚ğæ“¾‚µAupdate_record_condition‚ğ‘ã“ü‚·‚é
+// id : å¤‰æ›´ã™ã‚‹å‰ã®Recordã®id
+// update_record_condition : å¤‰æ›´å¾Œã®Record
+// target_recordã‚’ä½¿ç”¨ã—ã¦ã€tableã§ã®æ·»å­—ã‚’å–å¾—ã—ã€update_record_conditionã‚’ä»£å…¥ã™ã‚‹
 int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
 {
-    // id‚ª•ÏX‘O‚Æ•ÏXŒã‚Åˆê’v‚·‚é‚©ƒ`ƒFƒbƒN
+    // idãŒå¤‰æ›´å‰ã¨å¤‰æ›´å¾Œã§ä¸€è‡´ã™ã‚‹ã‹ãƒã‚§ãƒƒã‚¯
     if (id != update_record_condition.id)
     {
         cerr << FUNCNAME << "(): id of target_record and update_record_condition is not same" << endl;
         return kFailure;
     }
 
-    // update_record_condition‚ª§–ñ‚É”½‚µ‚Ä‚¢‚È‚¢‚©ƒ`ƒFƒbƒN‚·‚é
+    // update_record_conditionãŒåˆ¶ç´„ã«åã—ã¦ã„ãªã„ã‹ãƒã‚§ãƒƒã‚¯ã™ã‚‹
     if (checkRecord(update_record_condition, CHECK_RECORD_OPTION_UPDATE) == kFailure)
     {
         return kFailure;
     }
 
-    // id‚©‚çAprimary_index‚ğg‚Á‚ÄAtable[]‚Ì“Yš‚ğæ“¾
+    // idã‹ã‚‰ã€primary_indexã‚’ä½¿ã£ã¦ã€table[]ã®æ·»å­—ã‚’å–å¾—
     if (auto target_table_index_iterator = primary_index.find(id); target_table_index_iterator != primary_index.end())
     {
-        // •ÏX‚·‚é‘ÎÛ‚Ì“Yš‚ÉAupdate_record_condition‚ğ‘ã“ü
+        // å¤‰æ›´ã™ã‚‹å¯¾è±¡ã®æ·»å­—ã«ã€update_record_conditionã‚’ä»£å…¥
         redoLog->addUpdateLog(target_table_index_iterator->second, table[target_table_index_iterator->second], update_record_condition);
         // table[target_table_index_iterator->second] = update_record_condition;
         return kSuccess;
@@ -240,71 +240,71 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
     return kSuccess;
 }
 
-// updateRecord(uint64_t id, const Record &update_record_condition)‚ÌƒI[ƒo[ƒ[ƒh
+// updateRecord(uint64_t id, const Record &update_record_condition)ã®ã‚ªãƒ¼ãƒãƒ¼ãƒ­ãƒ¼ãƒ‰
 int DataBase::updateRecord(const Record &target_record, const Record &update_record_condition)
 {
     return updateRecord(target_record.id, update_record_condition);
 }
 
-// target_record.id‚É‚Ü‚¾“o˜^‚³‚ê‚Ä‚¢‚È‚¢ID‚ğ‘ã“ü‚·‚é
+// target_record.idã«ã¾ã ç™»éŒ²ã•ã‚Œã¦ã„ãªã„IDã‚’ä»£å…¥ã™ã‚‹
 int DataBase::setId2Record(Record &target_record)
 {
-    // id‚ªnull‚©A‚·‚Å‚Éid‚ª“o˜^‚³‚ê‚Ä‚¢‚éê‡‚ÍAid‚ğ•ÏX‚·‚é•K—v‚ª‚ ‚é
+    // idãŒnullã‹ã€ã™ã§ã«idãŒç™»éŒ²ã•ã‚Œã¦ã„ã‚‹å ´åˆã¯ã€idã‚’å¤‰æ›´ã™ã‚‹å¿…è¦ãŒã‚ã‚‹
     if (target_record.id == Record::kIdNull || primary_index.count(target_record.id) == 1)
     {
         uint64_t random_id = rnd();
-        // while(id‚ª“o˜^‚³‚ê‚Ä‚¢‚é || id==null(=0))
+        // while(idãŒç™»éŒ²ã•ã‚Œã¦ã„ã‚‹ || id==null(=0))
         while (primary_index.count(random_id) == 1 || random_id == Record::kIdNull)
         {
-            // random_id‚ğXV
+            // random_idã‚’æ›´æ–°
             random_id = rnd();
         }
-        // ‚Ü‚¾“o˜^‚³‚ê‚Ä‚¢‚È‚¢id‚ğ‘ã“ü
+        // ã¾ã ç™»éŒ²ã•ã‚Œã¦ã„ãªã„idã‚’ä»£å…¥
         target_record.id = random_id;
     }
     return kSuccess;
 }
 
-// check_record‚Å—^‚¦‚ç‚ê‚½Record‚ª§–ñ(database.hpp‚É‹LÚ)‚Éû‚Ü‚Á‚Ä‚¢‚é‚©ƒ`ƒFƒbƒN‚·‚é
-// option: ƒ`ƒFƒbƒN‚·‚é“à—e‚ªRecord‚Ìinsert‚Æupdate‚Å”÷–­‚Éˆá‚¤ 0:insert 1:update
+// check_recordã§ä¸ãˆã‚‰ã‚ŒãŸRecordãŒåˆ¶ç´„(database.hppã«è¨˜è¼‰)ã«åã¾ã£ã¦ã„ã‚‹ã‹ãƒã‚§ãƒƒã‚¯ã™ã‚‹
+// option: ãƒã‚§ãƒƒã‚¯ã™ã‚‹å†…å®¹ãŒRecordã®insertã¨updateã§å¾®å¦™ã«é•ã† 0:insert 1:update
 int DataBase::checkRecord(const Record &check_record, int option)
 {
-    // §–ñ1: id‚Íƒ†ƒj[ƒN‚Å‚ ‚é
-    // insert‚Ì‚Æ‚«‚Ì‚İ
+    // åˆ¶ç´„1: idã¯ãƒ¦ãƒ‹ãƒ¼ã‚¯ã§ã‚ã‚‹
+    // insertã®ã¨ãã®ã¿
     if (option == CHECK_RECORD_OPTION_INSERT)
     {
-        // id‚ª‚·‚Å‚É“o˜^‚³‚ê‚Ä‚¢‚éê‡
+        // idãŒã™ã§ã«ç™»éŒ²ã•ã‚Œã¦ã„ã‚‹å ´åˆ
         if (primary_index.count(check_record.id) != 0)
         {
             return kFailure;
         }
     }
 
-    // §–ñ2: id‚Í0ˆÈŠO‚Å‚ ‚é
+    // åˆ¶ç´„2: idã¯0ä»¥å¤–ã§ã‚ã‚‹
     if (check_record.id == Record::kIdNull)
     {
         return kFailure;
     }
 
-    // §–ñ3: column‚É“o˜^‚³‚ê‚Ä‚¢‚é(mapŒ^‚Å‚Ì)key‚ÌW‡‚ÍAcolumn_names‚ÉŠi”[‚³‚ê‚Ä‚¢‚é•¶š—ñ‚ÌW‡‚Æ“™‰¿‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢
-    // insert, update —¼•û
+    // åˆ¶ç´„3: columnã«ç™»éŒ²ã•ã‚Œã¦ã„ã‚‹(mapå‹ã§ã®)keyã®é›†åˆã¯ã€column_namesã«æ ¼ç´ã•ã‚Œã¦ã„ã‚‹æ–‡å­—åˆ—ã®é›†åˆã¨ç­‰ä¾¡ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„
+    // insert, update ä¸¡æ–¹
 
-    // Å‰‚É—v‘f”‚ğ”ä‚×‚é
+    // æœ€åˆã«è¦ç´ æ•°ã‚’æ¯”ã¹ã‚‹
     if (column_names.size() != check_record.columns.size())
     {
-        // —v‘f”‚ªˆá‚¤ê‡A“™‰¿‚Å‚È‚¢
+        // è¦ç´ æ•°ãŒé•ã†å ´åˆã€ç­‰ä¾¡ã§ãªã„
         return kFailure;
     }
 
-    // ‡”Ô‚Ékey‚ªˆê’v‚·‚é‚©‚ğ’²‚×‚é
-    // ‰Šú‰»®‚Ì’†‚ÅAfor(auto column_names_iterator = column_names.begin(), auto column_iterator = check_record.columns.begin())‚Æ‚·‚é‚ÆƒGƒ‰[‚ªo‚é
+    // é †ç•ªã«keyãŒä¸€è‡´ã™ã‚‹ã‹ã‚’èª¿ã¹ã‚‹
+    // åˆæœŸåŒ–å¼ã®ä¸­ã§ã€for(auto column_names_iterator = column_names.begin(), auto column_iterator = check_record.columns.begin())ã¨ã™ã‚‹ã¨ã‚¨ãƒ©ãƒ¼ãŒå‡ºã‚‹
     auto column_names_iterator = column_names.begin();
     auto column_iterator = check_record.columns.begin();
     for (;
          column_names_iterator != column_names.end() && column_iterator != check_record.columns.end();
          ++column_iterator, ++column_names_iterator)
     {
-        // column_names‚Ìkey ‚Æ column‚Ìkey‚ªˆê’v‚µ‚Ä‚¢‚È‚¢ê‡
+        // column_namesã®key ã¨ columnã®keyãŒä¸€è‡´ã—ã¦ã„ãªã„å ´åˆ
         if (*column_names_iterator != column_iterator->first)
         {
             return kFailure;
@@ -314,13 +314,13 @@ int DataBase::checkRecord(const Record &check_record, int option)
     return kSuccess;
 }
 
-// table[]‚Ì––”ö‚ÉV‚µ‚¢Record‚ğ’Ç‰Á
-// id‚ğŠ„‚èU‚é‚½‚ßAconst Record &new_record‚É‚µ‚Ä‚¢‚È‚¢
+// table[]ã®æœ«å°¾ã«æ–°ã—ã„Recordã‚’è¿½åŠ 
+// idã‚’å‰²ã‚ŠæŒ¯ã‚‹ãŸã‚ã€const Record &new_recordã«ã—ã¦ã„ãªã„
 int DataBase::insertRecord(Record &new_record)
 {
-    // ID‚ğƒZƒbƒg
+    // IDã‚’ã‚»ãƒƒãƒˆ
     setId2Record(new_record);
-    // Record‚Ì§–ñƒ`ƒFƒbƒN
+    // Recordã®åˆ¶ç´„ãƒã‚§ãƒƒã‚¯
     if (checkRecord(new_record, CHECK_RECORD_OPTION_INSERT) == kFailure)
     {
         cerr << FUNCNAME << "(): Failed to insert Record" << endl;
@@ -333,13 +333,13 @@ int DataBase::insertRecord(Record &new_record)
     return kSuccess;
 }
 
-// deleteRecord(uint64_t id)‚ÌƒI[ƒo[ƒ[ƒh
+// deleteRecord(uint64_t id)ã®ã‚ªãƒ¼ãƒãƒ¼ãƒ­ãƒ¼ãƒ‰
 int DataBase::deleteRecord(const Record &target_record)
 {
     return deleteRecord(target_record.id);
 }
 
-// target_record‚Åw’è‚µ‚½Record‚ğíœ‚·‚é
+// target_recordã§æŒ‡å®šã—ãŸRecordã‚’å‰Šé™¤ã™ã‚‹
 int DataBase::deleteRecord(uint64_t id)
 {
     if (id == Record::kIdNull)
@@ -348,7 +348,7 @@ int DataBase::deleteRecord(uint64_t id)
     }
 
     redoLog->addDeleteLog(id);
-    // target_record‚Ìid‚©‚ç
+    // target_recordã®idã‹ã‚‰
     uint32_t target_table_index;
     if (auto iterator = primary_index.find(id); iterator != end(primary_index))
     {
