@@ -86,7 +86,7 @@ public:
     std::unique_ptr<RedoLog> redoLog;
 
     // 現在の、tableに格納されているRecordの数
-    int table_num = 0;
+    std::uint32_t table_num = 0;
 
 private:
     std::random_device rnd;
@@ -120,6 +120,8 @@ public:
     int addDeleteLog(std::uint64_t id);
 
     int readRedoLog(std::stringstream &buffer);
+
+    int resetLogFile();
 
     const static int kSuccess = DataBase::kSuccess; // 成功を示す関数の戻り値
     const static int kFaliure = DataBase::kFailure; // 失敗を示す関数の戻り値

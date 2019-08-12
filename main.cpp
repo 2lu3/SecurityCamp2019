@@ -30,8 +30,6 @@ int main()
 
     vector<DataBase::Record> vec;
     dataBase.readRecord(record1.columns, vec);
-    cout << vec[0].id << " " << vec[0].columns["name"] << endl;
-    cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << endl;
     dataBase.deleteRecord(vec[0]);
 
     dataBase.commit();
@@ -39,7 +37,12 @@ int main()
     // dataBase.redoLog->readRedoLog(message);
 
     // 保存されているかの確認
-    cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
+    // cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
+
+    for (uint32_t i = 0; i < dataBase.table_num; ++i)
+    {
+        cout << i << " " << dataBase.table[i].id << " " << dataBase.table[i].columns["name"] << endl;
+    }
 
     // vector<DataBase::Record> vec;   // 条件に合うRecordを格納するための変数
     // map<string, string> conditions; // 条件

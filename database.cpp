@@ -32,9 +32,22 @@ using std::vector;
 
 RedoLog::RedoLog()
 {
-    ofstream file(log_file_name, std::ios::out);
 }
 
+int RedoLog::resetLogFile()
+{
+    ofstream file(log_file_name, std::ios::out);
+    if (file)
+    {
+        return kSuccess;
+    }
+    else
+    {
+        return kFaliure;
+    }
+}
+
+// redo.logに入っているデータをbufferに格納する
 int RedoLog::readRedoLog(stringstream &buffer)
 {
     ifstream file(log_file_name);
@@ -387,6 +400,7 @@ int DataBase::commit()
                     // primary_indexの更新
                     primary_index[table[i - 1].id] = i - 1;
                 }
+                --table_num;
             }
             else
             {
@@ -398,10 +412,11 @@ int DataBase::commit()
         {
             // error
             cerr << FUNCNAME << "(): Error" << endl;
+            return kFailure;
         }
         // cout << command << endl;
     }
-    return kSuccess;
+    return redoLog->resetLogFile();
 }
 
 int DataBase::abort()
@@ -489,7 +504,7 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     // 絞り込んでいる最中/絞り込んだtableの添字の集合
     vector<int> selected_table_index;
     // 最初は、0~レコードの数まですべて
-    for (int i = 0; i < table_num; ++i)
+    for (uint32_t i = 0; i < table_num; ++i)
     {
         selected_table_index.emplace_back(i);
     }
