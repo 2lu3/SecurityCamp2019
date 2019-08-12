@@ -111,6 +111,7 @@ private:
 class RedoLog
 {
 public:
+    RedoLog();
     // Insertを記録する
     int addInsertLog(const DataBase::Record &record);
     // Updateの前後の差分を記録する

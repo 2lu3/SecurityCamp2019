@@ -30,6 +30,11 @@ using std::vector;
 
 /* RedoLog関連 */
 
+RedoLog::RedoLog()
+{
+    ofstream file(log_file_name, std::ios::out);
+}
+
 int RedoLog::readRedoLog(stringstream &buffer)
 {
     ifstream file(log_file_name);
@@ -310,7 +315,7 @@ int DataBase::commit()
             // データの追加
             table[table_num] = record;
             // primary_indexへの追加
-            cout << "add " << record.id << " " << table_num << endl;
+            // cout << "add " << record.id << " " << table_num << endl;
             primary_index[record.id] = table_num;
             table_num++;
         }
@@ -360,10 +365,9 @@ int DataBase::commit()
                 return kFailure;
             }
         }
-        else if (command[1] == 'D')
+        else if (command[0] == 'D')
         {
             // delete
-            // update
             Record record;
             // 区切り文字のある番号(添字)
             // substrで、start_posからend_posまでを切り出す
@@ -372,7 +376,7 @@ int DataBase::commit()
             // end: 右側
             size_t end_pos = command.size();
 
-            uint64_t id = std::stoi(command.substr(start_pos + 1, end_pos - start_pos - 1));
+            uint64_t id = std::stoull(command.substr(start_pos + 1, end_pos - start_pos));
 
             if (auto iterator = primary_index.find(id); iterator != primary_index.end())
             {
@@ -395,7 +399,7 @@ int DataBase::commit()
             // error
             cerr << FUNCNAME << "(): Error" << endl;
         }
-        cout << command << endl;
+        // cout << command << endl;
     }
     return kSuccess;
 }
@@ -485,13 +489,10 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     // 絞り込んでいる最中/絞り込んだtableの添字の集合
     vector<int> selected_table_index;
     // 最初は、0~レコードの数まですべて
-    cout << "num" << table_num << endl;
     for (int i = 0; i < table_num; ++i)
     {
         selected_table_index.emplace_back(i);
     }
-
-    cout << "1" << endl;
 
     // 複数の条件を、順番に確認していく
     for (const auto &[column_name, column_value] : target_columns)
@@ -506,7 +507,6 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
                 // もし、値が一致しない場合は、条件に合っていないということ
                 if (table[*it].columns[column_name] != column_value)
                 {
-                    cout << "4 " << endl;
                     // selected_table_indexから削除
                     selected_table_index.erase(it);
                     --it;

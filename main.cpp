@@ -28,12 +28,11 @@ int main()
 
     dataBase.commit();
 
-    cout << dataBase.table_num << endl;
-    ;
-
     vector<DataBase::Record> vec;
     dataBase.readRecord(record1.columns, vec);
-    // dataBase.deleteRecord(vec[0]);
+    cout << vec[0].id << " " << vec[0].columns["name"] << endl;
+    cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << endl;
+    dataBase.deleteRecord(vec[0]);
 
     dataBase.commit();
     std::string message;
