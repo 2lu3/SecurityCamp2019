@@ -421,11 +421,150 @@ int DataBase::commit()
 
 int DataBase::abort()
 {
+    redoLog->resetLogFile();
     return kSuccess;
 }
 
 int DataBase::crashRecovery()
 {
+    stringstream buffer;
+    redoLog->readRedoLog(buffer);
+    while (std::getline(buffer, command, '\x1e'))
+    {
+
+        if (command[0] == 'I')
+        {
+            // insert
+            Record record;
+            // 区切り文字のある番号(添字)
+            // substrで、start_posからend_posまでを切り出す
+            // start: 左側
+            size_t start_pos = 6;
+            // end: 右側
+            size_t end_pos = -1;
+            string key, value;
+            do
+            {
+                // keyの取り出し
+                end_pos = command.find('\x1f', start_pos + 1);
+                key = command.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+
+                // valueの取り出し
+                end_pos = command.find('\x1f', start_pos + 1);
+                value = command.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+
+                // key-valueの保存
+                record.columns[key] = value;
+            } while (end_pos != SIZE_MAX);
+
+            // IDを設定
+            setId2Record(record);
+            // Recordの要件をチェック
+            if (checkRecord(record, CHECK_RECORD_OPTION_INSERT) == kFailure)
+            {
+                cerr << FUNCNAME << "():Error" << endl;
+                return kFailure;
+            }
+
+            if (table_num == table_max_num)
+            {
+                cerr << FUNCNAME << "(): Error" << endl;
+                return kFailure;
+            }
+            // データの追加
+            table[table_num] = record;
+            // primary_indexへの追加
+            // cout << "add " << record.id << " " << table_num << endl;
+            primary_index[record.id] = table_num;
+            table_num++;
+        }
+        else if (command[0] == 'U')
+        {
+            // update
+            Record record;
+            // 区切り文字のある番号(添字)
+            // substrで、start_posからend_posまでを切り出す
+            // start: 左側
+            size_t start_pos = 6;
+            // end: 右側
+            size_t end_pos = -1;
+
+            // idの取り出し
+            end_pos = command.find('\x1f', start_pos + 1);
+            uint64_t id = std::stoi(command.substr(start_pos + 1, end_pos - start_pos - 1));
+
+            if (auto iterator = primary_index.find(id); iterator != primary_index.end())
+            {
+                record = table[iterator->second];
+            }
+            else
+            {
+                cerr << FUNCNAME << "(): Error" << endl;
+                return kFailure;
+            }
+
+            string key, value;
+
+            do
+            {
+                // keyの取り出し
+                end_pos = command.find('\x1f', start_pos + 1);
+                key = command.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+
+                // valueの取り出し
+                end_pos = command.find('\x1f', start_pos + 1);
+                value = command.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+            } while (end_pos != SIZE_MAX);
+
+            if (checkRecord(record, CHECK_RECORD_OPTION_UPDATE) == kFailure)
+            {
+                cerr << FUNCNAME << "(): Error" << endl;
+                return kFailure;
+            }
+        }
+        else if (command[0] == 'D')
+        {
+            // delete
+            Record record;
+            // 区切り文字のある番号(添字)
+            // substrで、start_posからend_posまでを切り出す
+            // start: 左側
+            size_t start_pos = 6;
+            // end: 右側
+            size_t end_pos = command.size();
+
+            uint64_t id = std::stoull(command.substr(start_pos + 1, end_pos - start_pos));
+
+            if (auto iterator = primary_index.find(id); iterator != primary_index.end())
+            {
+                for (uint32_t i = iterator->second + 1; i < table_num; ++i)
+                {
+                    // tableの更新
+                    table[i - 1] = table[i];
+                    // primary_indexの更新
+                    primary_index[table[i - 1].id] = i - 1;
+                }
+                --table_num;
+            }
+            else
+            {
+                cerr << FUNCNAME << "(): Error" << endl;
+                return kFailure;
+            }
+        }
+        else
+        {
+            // error
+            cerr << FUNCNAME << "(): Error" << endl;
+            return kFailure;
+        }
+        // cout << command << endl;
+    }
+    return redoLog->resetLogFile();
     return kSuccess;
 }
 
@@ -459,12 +598,6 @@ int DataBase::deleteRecord(uint64_t id)
         cerr << FUNCNAME << "(): Error" << endl;
         return kFailure;
     }
-    // for (int i = target_table_index; i < table_num - 1; ++i)
-    // {
-    //     table[i] = table[i + 1];
-    // }
-    // --table_num;
-    // primary_index.erase(target_table_index);
     return kSuccess;
 }
 
@@ -481,10 +614,6 @@ int DataBase::insertRecord(Record &new_record)
         return kFailure;
     }
     return redoLog->addInsertLog(new_record);
-    // table[table_num] = new_record;
-    // primary_index[new_record.id] = table_num;
-    // table_num++;
-    // return kSuccess;
 }
 
 /*
