@@ -26,15 +26,21 @@ int main()
     record2.columns["age"] = "24";
     dataBase.insertRecord(record2);
 
-    record2.id = record1.id;
-    dataBase.updateRecord(record1, record2);
-    dataBase.deleteRecord(record1);
+    dataBase.commit();
 
+    cout << dataBase.table_num << endl;
+    ;
+
+    vector<DataBase::Record> vec;
+    dataBase.readRecord(record1.columns, vec);
+    // dataBase.deleteRecord(vec[0]);
+
+    dataBase.commit();
     std::string message;
-    dataBase.redoLog->readRedoLog(message);
+    // dataBase.redoLog->readRedoLog(message);
 
     // 保存されているかの確認
-    // cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
+    cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
 
     // vector<DataBase::Record> vec;   // 条件に合うRecordを格納するための変数
     // map<string, string> conditions; // 条件

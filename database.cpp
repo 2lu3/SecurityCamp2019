@@ -5,17 +5,20 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <sstream>
 #include <vector>
 
 using std::cerr;
 using std::cout;
 using std::endl;
 using std::extent;
+using std::flush;
 using std::ifstream;
 using std::int64_t;
 using std::map;
 using std::ofstream;
 using std::string;
+using std::stringstream;
 using std::to_string;
 using std::uint32_t;
 using std::uint64_t;
@@ -27,7 +30,7 @@ using std::vector;
 
 /* RedoLog関連 */
 
-int RedoLog::readRedoLog(string &message)
+int RedoLog::readRedoLog(stringstream &buffer)
 {
     ifstream file(log_file_name);
     if (!file)
@@ -36,17 +39,8 @@ int RedoLog::readRedoLog(string &message)
         return kFaliure;
     }
 
-    // ファイルの内容を一括読み込み
-    // ソース: https://fa11enprince.hatenablog.com/entry/2014/04/03/233500
-    std::istreambuf_iterator<char> iterator(file);
-    std::istreambuf_iterator<char> last;
+    buffer << file.rdbuf();
 
-    // message(iterator, last)としたかったが、エラーが出てきたので諦めた
-    string buffer(iterator, last);
-    message = buffer;
-
-    // 4 debug
-    cout << message << endl;
     return kSuccess;
 }
 
@@ -62,7 +56,7 @@ int RedoLog::addDeleteLog(uint64_t id)
     ofstream file(log_file_name, std::ios::app);
     if (file)
     {
-        file << log_message << endl;
+        file << log_message << flush;
         if (!file)
         {
             cerr << FUNCNAME << "(): Error" << endl;
@@ -93,7 +87,7 @@ int RedoLog::addInsertLog(const DataBase::Record &record)
     ofstream file(log_file_name, std::ios::app);
     if (file)
     {
-        file << log_message << endl;
+        file << log_message << flush;
         if (!file)
         {
             cerr << FUNCNAME << "(): Error" << endl;
@@ -137,7 +131,7 @@ int RedoLog::addUpdateLog(const DataBase::Record &before_record, const DataBase:
     ofstream file(log_file_name, std::ios::app);
     if (file)
     {
-        file << log_message << endl;
+        file << log_message << flush;
         if (!file)
         {
             cerr << FUNCNAME << "(): Error" << endl;
@@ -258,6 +252,151 @@ int DataBase::checkRecord(const Record &check_record, int option)
 
 int DataBase::commit()
 {
+    // 個々のコマンドを順番に格納する
+    // 例: INSERT key value ...
+    string command;
+
+    // redo.logファイルの内容すべてを格納する
+    stringstream buffer;
+
+    // bufferにファイルの内容をコピーする
+    redoLog->readRedoLog(buffer);
+
+    // 順番にアクセスする(コマンドごとの区切り文字は0x1e)
+    while (std::getline(buffer, command, '\x1e'))
+    {
+
+        if (command[0] == 'I')
+        {
+            // insert
+            Record record;
+            // 区切り文字のある番号(添字)
+            // substrで、start_posからend_posまでを切り出す
+            // start: 左側
+            size_t start_pos = 6;
+            // end: 右側
+            size_t end_pos = -1;
+            string key, value;
+            do
+            {
+                // keyの取り出し
+                end_pos = command.find('\x1f', start_pos + 1);
+                key = command.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+
+                // valueの取り出し
+                end_pos = command.find('\x1f', start_pos + 1);
+                value = command.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+
+                // key-valueの保存
+                record.columns[key] = value;
+            } while (end_pos != SIZE_MAX);
+
+            // IDを設定
+            setId2Record(record);
+            // Recordの要件をチェック
+            if (checkRecord(record, CHECK_RECORD_OPTION_INSERT) == kFailure)
+            {
+                cerr << FUNCNAME << "():Error" << endl;
+                return kFailure;
+            }
+
+            if (table_num == table_max_num)
+            {
+                cerr << FUNCNAME << "(): Error" << endl;
+                return kFailure;
+            }
+            // データの追加
+            table[table_num] = record;
+            // primary_indexへの追加
+            cout << "add " << record.id << " " << table_num << endl;
+            primary_index[record.id] = table_num;
+            table_num++;
+        }
+        else if (command[0] == 'U')
+        {
+            // update
+            Record record;
+            // 区切り文字のある番号(添字)
+            // substrで、start_posからend_posまでを切り出す
+            // start: 左側
+            size_t start_pos = 6;
+            // end: 右側
+            size_t end_pos = -1;
+
+            // idの取り出し
+            end_pos = command.find('\x1f', start_pos + 1);
+            uint64_t id = std::stoi(command.substr(start_pos + 1, end_pos - start_pos - 1));
+
+            if (auto iterator = primary_index.find(id); iterator != primary_index.end())
+            {
+                record = table[iterator->second];
+            }
+            else
+            {
+                cerr << FUNCNAME << "(): Error" << endl;
+                return kFailure;
+            }
+
+            string key, value;
+
+            do
+            {
+                // keyの取り出し
+                end_pos = command.find('\x1f', start_pos + 1);
+                key = command.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+
+                // valueの取り出し
+                end_pos = command.find('\x1f', start_pos + 1);
+                value = command.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+            } while (end_pos != SIZE_MAX);
+
+            if (checkRecord(record, CHECK_RECORD_OPTION_UPDATE) == kFailure)
+            {
+                cerr << FUNCNAME << "(): Error" << endl;
+                return kFailure;
+            }
+        }
+        else if (command[1] == 'D')
+        {
+            // delete
+            // update
+            Record record;
+            // 区切り文字のある番号(添字)
+            // substrで、start_posからend_posまでを切り出す
+            // start: 左側
+            size_t start_pos = 6;
+            // end: 右側
+            size_t end_pos = command.size();
+
+            uint64_t id = std::stoi(command.substr(start_pos + 1, end_pos - start_pos - 1));
+
+            if (auto iterator = primary_index.find(id); iterator != primary_index.end())
+            {
+                for (uint32_t i = iterator->second + 1; i < table_num; ++i)
+                {
+                    // tableの更新
+                    table[i - 1] = table[i];
+                    // primary_indexの更新
+                    primary_index[table[i - 1].id] = i - 1;
+                }
+            }
+            else
+            {
+                cerr << FUNCNAME << "(): Error" << endl;
+                return kFailure;
+            }
+        }
+        else
+        {
+            // error
+            cerr << FUNCNAME << "(): Error" << endl;
+        }
+        cout << command << endl;
+    }
     return kSuccess;
 }
 
@@ -289,7 +428,7 @@ int DataBase::deleteRecord(uint64_t id)
     }
 
     // target_recordのidからprimary_indexを使用して
-    uint32_t target_table_index;
+    // uint32_t target_table_index;
     if (auto iterator = primary_index.find(id); iterator != end(primary_index))
     {
         return redoLog->addDeleteLog(id);
@@ -346,10 +485,13 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     // 絞り込んでいる最中/絞り込んだtableの添字の集合
     vector<int> selected_table_index;
     // 最初は、0~レコードの数まですべて
+    cout << "num" << table_num << endl;
     for (int i = 0; i < table_num; ++i)
     {
         selected_table_index.emplace_back(i);
     }
+
+    cout << "1" << endl;
 
     // 複数の条件を、順番に確認していく
     for (const auto &[column_name, column_value] : target_columns)
@@ -364,13 +506,16 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
                 // もし、値が一致しない場合は、条件に合っていないということ
                 if (table[*it].columns[column_name] != column_value)
                 {
+                    cout << "4 " << endl;
                     // selected_table_indexから削除
                     selected_table_index.erase(it);
+                    --it;
                 }
             }
         }
         else
         {
+
             // 存在しないcolumnの名前を指定された場合
             cerr << "Error: " << FUNCNAME << "(): there is no column_name '" << column_name << "' in column_names" << endl;
             return kFailure;
@@ -382,6 +527,7 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     {
         return_records.emplace_back(table[*it]);
     }
+
     return kSuccess;
 }
 

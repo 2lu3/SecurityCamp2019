@@ -6,6 +6,7 @@
 #include <memory>
 #include <random>
 #include <set>
+#include <sstream>
 
 /*  データベース設計
 1. Read, Insert, Update, Deleteを複数回実行
@@ -84,10 +85,10 @@ public:
 
     std::unique_ptr<RedoLog> redoLog;
 
-private:
     // 現在の、tableに格納されているRecordの数
     int table_num = 0;
 
+private:
     std::random_device rnd;
 
     const int CHECK_RECORD_OPTION_INSERT = 0;
@@ -117,7 +118,7 @@ public:
     // Deleteを記録する
     int addDeleteLog(std::uint64_t id);
 
-    int readRedoLog(std::string &message);
+    int readRedoLog(std::stringstream &buffer);
 
     const static int kSuccess = DataBase::kSuccess; // 成功を示す関数の戻り値
     const static int kFaliure = DataBase::kFailure; // 失敗を示す関数の戻り値
