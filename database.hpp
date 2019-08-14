@@ -89,6 +89,7 @@ public:
     std::uint32_t table_num = 0;
 
 private:
+    std::stringstream write_set;
     std::random_device rnd;
 
     const int CHECK_RECORD_OPTION_INSERT = 0;

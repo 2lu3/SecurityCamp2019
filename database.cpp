@@ -66,7 +66,7 @@ int RedoLog::readRedoLog(stringstream &buffer)
 // commitを開始したというメッセージをredo.logに出力する
 int RedoLog::commitStart()
 {
-    ofstream file(log_file_name);
+    ofstream file(log_file_name, std::ios::app);
     if (!file)
     {
         cerr << FUNCNAME << "(): Error" << endl;
@@ -286,6 +286,7 @@ int DataBase::checkRecord(const Record &check_record, int option)
 int DataBase::commit()
 {
     redoLog->commitStart();
+    // fsync()
     // 個々のコマンドを順番に格納する
     // 例: INSERT key value ...
     string command;
@@ -458,7 +459,6 @@ int DataBase::commit()
     cerr << "there is no commit start message" << endl;
     return kFailure;
 }
-
 
 int DataBase::abort()
 {
@@ -657,7 +657,15 @@ int DataBase::insertRecord(Record &new_record)
         cerr << FUNCNAME << "(): Failed to insert Record" << endl;
         return kFailure;
     }
-    return redoLog->addInsertLog(new_record);
+    // 完成図 : INSERT(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1f)(\x1e)
+    write_set << "INSERT\x1f";
+    for (const auto &[key, value] : new_record.columns)
+    {
+        write_set << key << '\x1f' << value << '\x1f';
+    }
+    write_set << '\x1e';
+
+    return kSuccess;
 }
 
 /*

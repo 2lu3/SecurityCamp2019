@@ -2,39 +2,84 @@
 #include <map>
 #include <string>
 #include <map>
+#include <fstream>
 
 #include "database.hpp"
 
+using std::cerr;
 using std::cout;
 using std::endl;
+using std::flush;
 using std::map;
 using std::string;
 using std::vector;
+
+/*
+1. read, update, delete, insert
+
+2. commit開始
+
+エラー：commit失敗扱い -> abort処理へ
+クラッシュ：なにも作業していないので、crashRecoveryでcommitするだけ
+
+2-1. commit開始をredo.logに追加
+
+エラー：commit失敗扱い -> abort処理へ
+クラッシュ：commit処理を実行
+
+3. commit処理中
+
+エラー：commit
+
+4. commit終了
+2-2. redo.logを消去
+
+
+
+*/
 
 int main()
 {
     system("chcp 65001");
     DataBase dataBase;
-    DataBase::Record record1, record2;
+    DataBase::Record record;
 
-    // Recordの追加(x 2)
-    record1.columns["name"] = "Yamada";
-    record1.columns["age"] = "12";
-    dataBase.insertRecord(record1);
+    // データの入力
+    std::ifstream file("data.csv");
+    if (!file)
+    {
+        cerr << "Failed to load data.csv" << endl;
+        return 1;
+    }
+    string buffer;
+    while (std::getline(file, buffer))
+    {
+        int first_split = buffer.find(',');
+        int second_split = buffer.find(',', first_split + 1);
 
-    record2.columns["name"] = "Tanaka";
-    record2.columns["age"] = "24";
-    dataBase.insertRecord(record2);
+        string name = buffer.substr(first_split + 1, second_split - first_split - 1);
+        string age = buffer.substr(second_split + 1);
+        record.columns["name"] = name;
+        record.columns["age"] = age;
+        dataBase.insertRecord(record);
+    }
 
     dataBase.commit();
 
+    cout << "table num " << dataBase.table_num << endl;
+    for (int i = 0; i < dataBase.table_num; ++i)
+    {
+        cout << "index " << i << flush;
+        cout << " id " << dataBase.table[i].id << " name " << dataBase.table[i].columns["name"] << " age " << dataBase.table[i].columns["age"] << endl;
+    }
+
     vector<DataBase::Record> vec;
-    dataBase.readRecord(record1.columns, vec);
+    // dataBase.readRecord(record1.columns, vec);
     dataBase.deleteRecord(vec[0]);
 
     dataBase.commit();
 
-    dataBase.readRecord(record2.columns, vec);
+    // dataBase.readRecord(record2.columns, vec);
 
     DataBase::Record record3 = vec[0];
     record3.columns["name"] = "zyugemuzyugemu";
