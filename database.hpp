@@ -29,8 +29,6 @@
         * redo.logを破棄する
  */
 
-class RedoLog;
-
 class DataBase
 {
 public:
@@ -42,7 +40,10 @@ public:
         3: columnsのkeyはすべてのRecordで共通でなければならない */
     struct Record
     {
-        Record();
+        Record()
+        {
+            id = kIdNull;
+        }
         const static std::uint64_t kIdNull = 0;
         std::uint64_t id;
         std::map<std::string, std::string> columns;
@@ -80,13 +81,12 @@ public:
     // target_recordにまだ登録されていないIDを設定する
     int setId2Record(Record &target_record);
 
-    std::unique_ptr<RedoLog> redoLog;
-
     // 現在の、tableに格納されているRecordの数
     std::uint32_t table_num = 0;
 
+    std::map<std::uint64_t, Record> primary_index;
+
 private:
-    std::stringstream write_set;
     std::random_device rnd;
 
     // Recordが制約に収まっているかチェックする
@@ -95,44 +95,12 @@ private:
     std::set<std::string> column_names = {"name", "age"};
 
     // id-tableの添字を格納する
-    std::map<std::uint64_t, Record> primary_index;
     // update : write_setに書き換えたものを代入
     // insert : primary_indexにないidを追加
     // delete : map.size() = 0
     std::map<std::uint64_t, Record> write_set;
     // map<pair<column名, value>, set<id>> : keyを指定したうえで、valueからidを効率的に探す
     std::map<std::pair<std::string, std::string>, std::set<std::uint64_t>> column_index;
-};
-
-class UndoLog
-{
-public:
-private:
-};
-
-class RedoLog
-{
-public:
-    RedoLog();
-    // Insertを記録する
-    int addInsertLog(const DataBase::Record &record);
-    // Updateの前後の差分を記録する
-    int addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record);
-    // Deleteを記録する
-    int addDeleteLog(std::uint64_t id);
-    int commitStart();
-
-    int readRedoLog(std::stringstream &buffer);
-
-    int resetLogFile();
-
-    const static int kSuccess = DataBase::kSuccess; // 成功を示す関数の戻り値
-    const static int kFaliure = DataBase::kFailure; // 失敗を示す関数の戻り値
-
-    const std::string commit_start_message = "commitstart";
-
-private:
-    const char log_file_name[10] = "redo.log";
 };
 
 #endif //SECURITYCAMP2019_DATABASE_HPP_

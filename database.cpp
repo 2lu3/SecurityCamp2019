@@ -30,17 +30,9 @@ using std::vector;
 // 現在の関数名を取得
 #define FUNCNAME __FUNCTION__
 
-/* Record関連 */
-
-DataBase::Record::Record()
-{
-    // idはnull値で初期化
-    id = kIdNull;
-}
-
 /* DataBase関連 */
 
-DataBase::DataBase() : redoLog(new RedoLog)
+DataBase::DataBase()
 {
 }
 
@@ -101,9 +93,32 @@ int DataBase::commit()
     // todo : ファイル書き込み
 
     // write_setの内容をprimary_indexに反映する
-    for (auto itr = write_set.begin; itr != write_set.end(); ++itr)
+    for (auto write_set_itr = write_set.begin(); write_set_itr != write_set.end(); ++write_set_itr)
     {
-        primary_index[itr->first] = itr->second;
+        const auto &selected_record = write_set_itr->second;
+        const auto &id = write_set_itr->first;
+        if (selected_record.columns.empty())
+        {
+            // delete
+            if (auto primary_index_itr = primary_index.find(id); primary_index_itr != primary_index.end())
+            {
+                // primary_indexに登録されていた場合
+
+                // column_indexから消去
+                for (const auto &key_values_pair : primary_index_itr->second.columns)
+                {
+                    // column_index[key_values_pair] == set<id>
+                    column_index[key_values_pair].erase(id);
+                }
+
+                // primary_indexからも削除
+                primary_index.erase(write_set_itr->first);
+            }
+        }
+        else
+        {
+            primary_index[id] = selected_record;
+        }
     }
 
     return kSuccess;
@@ -112,7 +127,6 @@ int DataBase::commit()
 int DataBase::abort()
 {
     // ファイルの内容を破棄するだけ
-    redoLog->resetLogFile();
     return kSuccess;
 }
 
@@ -204,12 +218,21 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
     // return_recordsの初期化
     return_records.clear();
 
-    // 2つ用意して、mergeする
+    // 2つsetを用意して、mergeする
+    // 0: 今まで絞り込んだset
+    // 1: 今から絞り込むset
     set<uint64_t> column_sets[2];
     int i = 0;
 
+    // 条件を順番に調べていくぅ
     for (const auto &column_name_value_pair : target_columns)
     {
+        if (auto column_names_itr = column_names.find(column_name_value_pair.first); column_names_itr == column_names.end())
+        {
+            // column_nameが、column_namesに登録されていない場合
+            cerr << "Error " << FUNCNAME << "(): column name error" << endl;
+            return kFailure;
+        }
         // write set検索
         // write set(map型)内のRecordをすべて回す
         // write_set_itr->second = write_set内のRecord
@@ -218,13 +241,14 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
             // Recordのcolumnsのcolumn_nameがcolumn_valueかどうか
             // itrは、columnsのiterator
             // if(auto itr = record.columns.find(column_name); itr != record.columns.end())
-            if (auto itr = write_set_itr->second.columns.find(column_name_value_pair.first); itr != write_set_itr->second.columns.end())
+            auto &selected_record = write_set_itr->second;
+            if (auto itr = selected_record.columns.find(column_name_value_pair.first); itr != selected_record.columns.end())
             {
                 // Record.column[column_name] == value
                 if (itr->second == column_name_value_pair.second)
                 {
                     // column_sets[iが0なら0、それ以外なら1]に追加
-                    column_sets[i == 0].insert(write_set_itr->second.id);
+                    column_sets[i != 0].insert(selected_record.id);
                 }
             }
         }
@@ -241,7 +265,7 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
                 {
                     // 存在しない場合のみ追加
                     // i==0のとき0,それ以外の時1にする
-                    column_sets[i == 0].insert(id);
+                    column_sets[i != 0].insert(id);
                 }
             }
             if (i == 0)
@@ -252,9 +276,16 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
         }
         else
         {
-            // todo; keyが正しい場合は、パス
-            cerr << "Error: " << FUNCNAME << "(): column_name and value error" << endl;
-            return kFailure;
+            if (auto column_names_itr = column_names.find(column_name_value_pair.first); column_names_itr != column_names.end())
+            {
+                //  keyが正しい場合は、パス
+                continue;
+            }
+            else
+            {
+                cerr << "Error: " << FUNCNAME << "(): column_name and value error" << endl;
+                return kFailure;
+            }
         }
         auto itr0 = column_sets[0].begin();
         auto itr1 = column_sets[1].begin();
@@ -333,6 +364,7 @@ int DataBase::readRecord(uint64_t id, Record &return_record)
             return kFailure;
         }
     }
+    return kSuccess;
 }
 
 /*
@@ -343,7 +375,7 @@ int DataBase::readRecord(uint64_t id, Record &return_record)
 int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
 {
     // update_record_conditionが制約に反していないかチェックする
-    if (checkRecord(update_record_condition, CHECK_RECORD_OPTION_UPDATE) == kFailure)
+    if (checkRecord(update_record_condition) == kFailure)
     {
         cerr << "Error: " << FUNCNAME << "(): Check Record Error" << endl;
         return kFailure;
@@ -351,12 +383,33 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
 
     if (auto iterator = primary_index.find(id); iterator != primary_index.end())
     {
+        if (auto itr = write_set.find(id); itr != primary_index.end())
+        {
+            // write_setにすでにある場合
+            if (itr->second.columns.empty())
+            {
+                // 削除されたRecordの場合
+                cerr << "Error: " << FUNCNAME << "(): alredy deleted" << endl;
+                return kFailure;
+            }
+            else
+            {
+                // 削除されていない場合
+                itr->second = update_record_condition;
+            }
+        }
+        else
+        {
+            // write_setにまだ登録されていない場合
+            itr->second = update_record_condition;
+        }
     }
     else
     {
         cerr << FUNCNAME << "(): Error" << endl;
         return kFailure;
     }
+    return kSuccess;
 }
 
 // updateRecord(uint64_t id, const Record &update_record_condition)のオーバーロード

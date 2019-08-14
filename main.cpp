@@ -66,16 +66,15 @@ int main()
 
     dataBase.commit();
 
-    cout << "table num " << dataBase.table_num << endl;
-    for (int i = 0; i < dataBase.table_num; ++i)
+    for (auto itr = dataBase.primary_index.begin(); itr != dataBase.primary_index.end(); ++itr)
     {
-        cout << "index " << i << flush;
-        cout << " id " << dataBase.table[i].id << " name " << dataBase.table[i].columns["name"] << " age " << dataBase.table[i].columns["age"] << endl;
+        cout << itr->second.columns["name"] << " " << itr->second.columns["age"] << endl;
     }
 
     vector<DataBase::Record> vec;
-    // dataBase.readRecord(record1.columns, vec);
-    dataBase.deleteRecord(vec[0]);
+    dataBase.readRecord(record.columns, vec);
+
+    // dataBase.deleteRecord(vec[0]);
 
     dataBase.commit();
 
@@ -86,16 +85,17 @@ int main()
     dataBase.updateRecord(vec[0], record3);
 
     dataBase.commit();
+
+    for (auto &[id, rec] : dataBase.primary_index)
+    {
+        cout << rec.columns["name"] << endl;
+    }
+
     std::string message;
     // dataBase.redoLog->readRedoLog(message);
 
     // 保存されているかの確認
     // cout << dataBase.table[0].id << " " << dataBase.table[0].columns["name"] << dataBase.table[0].columns["age"] << endl;
-
-    for (uint32_t i = 0; i < dataBase.table_num; ++i)
-    {
-        cout << i << " " << dataBase.table[i].id << " " << dataBase.table[i].columns["name"] << endl;
-    }
 
     // vector<DataBase::Record> vec;   // 条件に合うRecordを格納するための変数
     // map<string, string> conditions; // 条件
