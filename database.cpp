@@ -71,7 +71,6 @@ int DataBase::checkRecord(const Record &check_record)
     }
 
     // 順番にkeyが一致するかを調べる
-    // 初期化式の中で、for(auto column_names_iterator = column_names.begin(), auto column_iterator = check_record.columns.begin())とするとエラーが出る
     auto column_names_iterator = column_names.begin();
     auto column_iterator = check_record.columns.begin();
     for (;
