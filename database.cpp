@@ -7,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <set>
 
 using std::cerr;
 using std::cout;
@@ -17,6 +18,7 @@ using std::ifstream;
 using std::int64_t;
 using std::map;
 using std::ofstream;
+using std::set;
 using std::string;
 using std::stringstream;
 using std::to_string;
@@ -27,158 +29,6 @@ using std::vector;
 
 // 現在の関数名を取得
 #define FUNCNAME __FUNCTION__
-
-/* RedoLog関連 */
-
-RedoLog::RedoLog()
-{
-}
-
-// redo.logを初期化する
-int RedoLog::resetLogFile()
-{
-    ofstream file(log_file_name, std::ios::out);
-    if (file)
-    {
-        return kSuccess;
-    }
-    else
-    {
-        return kFaliure;
-    }
-}
-
-// redo.logに入っているデータをbufferに格納する
-int RedoLog::readRedoLog(stringstream &buffer)
-{
-    ifstream file(log_file_name);
-    if (!file)
-    {
-        cerr << FUNCNAME << "(): Error" << endl;
-        return kFaliure;
-    }
-
-    buffer << file.rdbuf();
-
-    return kSuccess;
-}
-
-// commitを開始したというメッセージをredo.logに出力する
-int RedoLog::commitStart()
-{
-    ofstream file(log_file_name, std::ios::app);
-    if (!file)
-    {
-        cerr << FUNCNAME << "(): Error" << endl;
-        return kFaliure;
-    }
-
-    file << commit_start_message << flush;
-    return kSuccess;
-}
-
-/* RedoLog Delete Insert Update */
-
-// DeleteのRedoLogをredo.logに記録する
-int RedoLog::addDeleteLog(uint64_t id)
-{
-    // 完成図 : DELETE(\x1f)id(\x1e)
-    string log_message = "DELETE\x1f" + to_string(id) + '\x1e';
-
-    // ファイルへの書き込み
-    ofstream file(log_file_name, std::ios::app);
-    if (file)
-    {
-        file << log_message << flush;
-        if (!file)
-        {
-            cerr << FUNCNAME << "(): Error" << endl;
-            return kFaliure;
-        }
-    }
-    else
-    {
-        cerr << FUNCNAME << "(): Error" << endl;
-        return kFaliure;
-    }
-    return kSuccess;
-}
-
-// InsertのRedoLogをredo.logに記録する
-int RedoLog::addInsertLog(const DataBase::Record &record)
-{
-    // 完成図 : INSERT(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1f)(\x1e)
-    string log_message = "INSERT\x1f";
-
-    for (const auto &[key, value] : record.columns)
-    {
-        log_message += key + '\x1f' + value + '\x1f';
-    }
-    log_message += '\x1e';
-
-    // ファイルへの書き込み
-    ofstream file(log_file_name, std::ios::app);
-    if (file)
-    {
-        file << log_message << flush;
-        if (!file)
-        {
-            cerr << FUNCNAME << "(): Error" << endl;
-            return kFaliure;
-        }
-    }
-    else
-    {
-        cerr << FUNCNAME << "(): Error" << endl;
-        return kFaliure;
-    }
-
-    return kSuccess;
-}
-
-// UpdateのRedoLogをredo.logに記録する
-int RedoLog::addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record)
-{
-    // 完成図 : UPDATE(\x1f)id(\x1f)変更するkey(\x1f)変更するvalue(\x1f)...(\x1f)変更するkey(\x1f)変更するvalue(\x1f)(\x1e)
-    // RedoLogの内容
-    string log_message = "UPDATE\x1f" + to_string(updated_record.id) + '\x1f';
-
-    // before_recordとupdate_recordのcolumnのvalueを順番に比較する
-    auto before_record_iterator = before_record.columns.begin();
-    auto updated_record_iterator = updated_record.columns.begin();
-    for (;
-         before_record_iterator != before_record.columns.end();
-         ++before_record_iterator, ++updated_record_iterator)
-    {
-        // keyが同じであることは、updateRecordで確認済み
-        if (before_record_iterator->second != updated_record_iterator->second)
-        {
-            // valueが一致しない場合、変更されている
-            // log_message = (\x1f)key(\x1f)value
-            log_message += updated_record_iterator->first + '\x1f' + updated_record_iterator->second + '\x1f';
-        }
-    }
-    log_message += '\x1e';
-
-    // ファイルへの書き込み
-    ofstream file(log_file_name, std::ios::app);
-    if (file)
-    {
-        file << log_message << flush;
-        if (!file)
-        {
-            cerr << FUNCNAME << "(): Error" << endl;
-            return kFaliure;
-        }
-    }
-    else
-    {
-        cerr << FUNCNAME << "(): Error" << endl;
-        return kFaliure;
-    }
-
-    return kSuccess;
-}
 
 /* Record関連 */
 
@@ -207,55 +57,18 @@ int DataBase::createKey(std::string columns[])
     return kSuccess;
 }
 
-// target_record.idにまだ登録されていないIDを代入する
-int DataBase::setId2Record(Record &target_record)
-{
-    // idがnullか、すでにidが登録されている場合は、idを変更する必要がある
-    if (target_record.id == Record::kIdNull || primary_index.count(target_record.id) == 1)
-    {
-        uint64_t random_id = rnd();
-        // while(idが登録されている || id==null(=0))
-        while (primary_index.count(random_id) == 1 || random_id == Record::kIdNull)
-        {
-            // random_idを更新
-            random_id = rnd();
-        }
-        // まだ登録されていないidを代入
-        target_record.id = random_id;
-    }
-    return kSuccess;
-}
-
 // check_recordで与えられたRecordが制約(database.hppに記載)に収まっているかチェックする
-// option: チェックする内容がRecordのinsertとupdateで微妙に違う 0:insert 1:update
-int DataBase::checkRecord(const Record &check_record, int option)
+int DataBase::checkRecord(const Record &check_record)
 {
-    // 制約1: idはユニークである
-    // insertのときのみ
-    // 追記 : RedoLogの実装で必要なくなった
-    // if (option == CHECK_RECORD_OPTION_INSERT)
-    // {
-    //     // idがすでに登録されている場合
-    //     if (primary_index.count(check_record.id) != 0)
-    //     {
-    //         return kFailure;
-    //     }
-    // }
-
-    // 制約2: idは0以外である
-    // Insertのときは後でIDを振るのでパス
-    if (option != CHECK_RECORD_OPTION_INSERT)
+    // 制約2: idはkIdNull以外である
+    if (check_record.id == Record::kIdNull)
     {
-        if (check_record.id == Record::kIdNull)
-        {
-            cerr << "Error: " << FUNCNAME << "(): ID = 0" << endl;
-            return kFailure;
-        }
+        cerr << "Error " << FUNCNAME << "(): IDNULL" << endl;
+        return kFailure;
     }
 
     // 制約3: columnに登録されている(map型での)keyの集合は、column_namesに格納されている文字列の集合と等価でなければならない
     // insert, update 両方
-
     // 最初に要素数を比べる
     if (column_names.size() != check_record.columns.size())
     {
@@ -285,179 +98,15 @@ int DataBase::checkRecord(const Record &check_record, int option)
 
 int DataBase::commit()
 {
-    redoLog->commitStart();
-    // fsync()
-    // 個々のコマンドを順番に格納する
-    // 例: INSERT key value ...
-    string command;
+    // todo : ファイル書き込み
 
-    // redo.logファイルの内容すべてを格納する
-    stringstream buffer;
-
-    // bufferにファイルの内容をコピーする
-    redoLog->readRedoLog(buffer);
-
-    // 順番にアクセスする(コマンドごとの区切り文字は0x1e)
-    while (std::getline(buffer, command, '\x1e'))
+    // write_setの内容をprimary_indexに反映する
+    for (auto itr = write_set.begin; itr != write_set.end(); ++itr)
     {
-        if (command[0] == 'I')
-        {
-            // insert
-            // 完成図 : INSERT(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1f)(\x1e)
-            Record record;
-            // 区切り文字のある番号(添字)
-            // substrで、start_posからend_posまでを切り出す
-            // start: 左側
-            size_t start_pos = 6;
-            // end: 右側
-            size_t end_pos = -1;
-            string key, value;
-            auto command_size = command.size();
-            do
-            {
-                // keyの取り出し
-                end_pos = command.find('\x1f', start_pos + 1);
-                key = command.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-
-                // valueの取り出し
-                end_pos = command.find('\x1f', start_pos + 1);
-                value = command.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-
-                // key-valueの保存
-                record.columns[key] = value;
-            } while (end_pos != command_size - 1);
-
-            // IDを設定
-            setId2Record(record);
-            // Recordの要件をチェック
-            if (checkRecord(record, CHECK_RECORD_OPTION_INSERT) == kFailure)
-            {
-                cerr << "Error: " << FUNCNAME << "(): check record error" << endl;
-                return kFailure;
-            }
-
-            if (table_num == table_max_num)
-            {
-                cerr << "Error: " << FUNCNAME << "(): table num error" << endl;
-                return kFailure;
-            }
-            // データの追加
-            table[table_num] = record;
-            // primary_indexへの追加
-            // cout << "add " << record.id << " " << table_num << endl;
-            primary_index[record.id] = table_num;
-            table_num++;
-        }
-        else if (command[0] == 'U')
-        {
-            // update
-            // 完成図 : UPDATE(\x1f)id(\x1f)変更するkey(\x1f)変更するvalue(\x1f)...(\x1f)変更するkey(\x1f)変更するvalue(\x1f)(\x1e)
-            // RedoLogの内容
-
-            // 区切り文字のある番号(添字)
-            // substrで、start_posからend_posまでを切り出す
-            // start: 左側
-            size_t start_pos = 6;
-            // end: 右側
-            size_t end_pos = -1;
-
-            // idの取り出し
-            end_pos = command.find('\x1f', start_pos + 1);
-            uint64_t id = std::stoi(command.substr(start_pos + 1, end_pos - start_pos - 1));
-
-            start_pos = end_pos;
-
-            // tableでの添字
-            uint32_t table_index;
-
-            // primary_index = map<id, table_index>
-            if (auto iterator = primary_index.find(id); iterator != primary_index.end())
-            {
-                table_index = iterator->second;
-            }
-            else
-            {
-                cerr << FUNCNAME << "(): Error" << endl;
-                return kFailure;
-            }
-
-            string key, value;
-
-            auto command_size = command.size();
-            do
-            {
-                // keyの取り出し
-                end_pos = command.find('\x1f', start_pos + 1);
-                key = command.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-
-                // valueの取り出し
-                end_pos = command.find('\x1f', start_pos + 1);
-                value = command.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-
-                // key-valueの代入
-                table[table_index].columns[key] = value;
-            } while (end_pos != command_size - 1);
-
-            if (checkRecord(table[table_index], CHECK_RECORD_OPTION_UPDATE) == kFailure)
-            {
-                cerr << FUNCNAME << "(): Error" << endl;
-                return kFailure;
-            }
-        }
-        else if (command[0] == 'D')
-        {
-            // delete
-            // 完成図 : DELETE(\x1f)id(\x1e)
-            Record record;
-            // 区切り文字のある番号(添字)
-            // substrで、start_posからend_posまでを切り出す
-            // start: 左側
-            size_t start_pos = 6;
-            // end: 右側
-            size_t end_pos = command.size();
-
-            uint64_t id = std::stoull(command.substr(start_pos + 1, end_pos - start_pos));
-
-            if (auto iterator = primary_index.find(id); iterator != primary_index.end())
-            {
-                // primary_indexから対象のidを削除
-                primary_index.erase(id);
-                // for(int i = table_index + 1; i < table_num)
-                for (uint32_t i = iterator->second + 1; i < table_num; ++i)
-                {
-                    // tableの更新
-                    table[i - 1] = table[i];
-                    // primary_indexの更新
-                    primary_index[table[i - 1].id] = i - 1;
-                }
-
-                --table_num;
-            }
-            else
-            {
-                cerr << FUNCNAME << "(): Error" << endl;
-                return kFailure;
-            }
-        }
-        else if (command == redoLog->commit_start_message)
-        {
-            // commit startメッセージ
-            // 正常終了
-            return redoLog->resetLogFile();
-        }
-        else
-        {
-            // error
-            cerr << "Error: " << FUNCNAME << "(): undefined command " << command << endl;
-            return kFailure;
-        }
+        primary_index[itr->first] = itr->second;
     }
-    cerr << "there is no commit start message" << endl;
-    return kFailure;
+
+    return kSuccess;
 }
 
 int DataBase::abort()
@@ -470,145 +119,6 @@ int DataBase::abort()
 // 未実装
 int DataBase::crashRecovery()
 {
-    stringstream buffer;
-    redoLog->readRedoLog(buffer);
-    string command;
-    while (std::getline(buffer, command, '\x1e'))
-    {
-
-        if (command[0] == 'I')
-        {
-            // insert
-            Record record;
-            // 区切り文字のある番号(添字)
-            // substrで、start_posからend_posまでを切り出す
-            // start: 左側
-            size_t start_pos = 6;
-            // end: 右側
-            size_t end_pos = -1;
-            string key, value;
-            do
-            {
-                // keyの取り出し
-                end_pos = command.find('\x1f', start_pos + 1);
-                key = command.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-
-                // valueの取り出し
-                end_pos = command.find('\x1f', start_pos + 1);
-                value = command.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-
-                // key-valueの保存
-                record.columns[key] = value;
-            } while (end_pos != SIZE_MAX);
-
-            // IDを設定
-            setId2Record(record);
-            // Recordの要件をチェック
-            if (checkRecord(record, CHECK_RECORD_OPTION_INSERT) == kFailure)
-            {
-                cerr << FUNCNAME << "():Error" << endl;
-                return kFailure;
-            }
-
-            if (table_num == table_max_num)
-            {
-                cerr << FUNCNAME << "(): Error" << endl;
-                return kFailure;
-            }
-            // データの追加
-            table[table_num] = record;
-            // primary_indexへの追加
-            // cout << "add " << record.id << " " << table_num << endl;
-            primary_index[record.id] = table_num;
-            table_num++;
-        }
-        else if (command[0] == 'U')
-        {
-            // update
-            Record record;
-            // 区切り文字のある番号(添字)
-            // substrで、start_posからend_posまでを切り出す
-            // start: 左側
-            size_t start_pos = 6;
-            // end: 右側
-            size_t end_pos = -1;
-
-            // idの取り出し
-            end_pos = command.find('\x1f', start_pos + 1);
-            uint64_t id = std::stoi(command.substr(start_pos + 1, end_pos - start_pos - 1));
-
-            if (auto iterator = primary_index.find(id); iterator != primary_index.end())
-            {
-                record = table[iterator->second];
-            }
-            else
-            {
-                cerr << FUNCNAME << "(): Error" << endl;
-                return kFailure;
-            }
-
-            string key, value;
-
-            do
-            {
-                // keyの取り出し
-                end_pos = command.find('\x1f', start_pos + 1);
-                key = command.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-
-                // valueの取り出し
-                end_pos = command.find('\x1f', start_pos + 1);
-                value = command.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-            } while (end_pos != SIZE_MAX);
-
-            if (checkRecord(record, CHECK_RECORD_OPTION_UPDATE) == kFailure)
-            {
-                cerr << FUNCNAME << "(): Error" << endl;
-                return kFailure;
-            }
-        }
-        else if (command[0] == 'D')
-        {
-            // delete
-            Record record;
-            // 区切り文字のある番号(添字)
-            // substrで、start_posからend_posまでを切り出す
-            // start: 左側
-            size_t start_pos = 6;
-            // end: 右側
-            size_t end_pos = command.size();
-
-            uint64_t id = std::stoull(command.substr(start_pos + 1, end_pos - start_pos));
-
-            if (auto iterator = primary_index.find(id); iterator != primary_index.end())
-            {
-                for (uint32_t i = iterator->second + 1; i < table_num; ++i)
-                {
-                    // tableの更新
-                    table[i - 1] = table[i];
-                    // primary_indexの更新
-                    primary_index[table[i - 1].id] = i - 1;
-                }
-                --table_num;
-            }
-            else
-            {
-                cerr << FUNCNAME << "(): Error" << endl;
-                return kFailure;
-            }
-        }
-        else
-        {
-            // error
-            cerr << FUNCNAME << "(): Error" << endl;
-            return kFailure;
-        }
-        // cout << command << endl;
-    }
-    return redoLog->resetLogFile();
     return kSuccess;
 }
 
@@ -623,24 +133,16 @@ int DataBase::deleteRecord(const Record &target_record)
 // target_recordで指定したRecordを削除する
 int DataBase::deleteRecord(uint64_t id)
 {
-    if (id == Record::kIdNull)
+    // write_setにすでに登録済みか
+    if (auto itr = write_set.find(id); itr != write_set.end())
     {
-        cerr << FUNCNAME << "(): Error" << endl;
-        return kFailure;
-    }
-
-    // target_recordのidからprimary_indexを使用して
-    // uint32_t target_table_index;
-    if (auto iterator = primary_index.find(id); iterator != end(primary_index))
-    {
-        return redoLog->addDeleteLog(id);
-        // target_table_index = iterator->second;
+        // columnsを空にすることで消去を表す
+        itr->second.columns.clear();
     }
     else
     {
-        // そのidのrecordは存在しない
-        cerr << FUNCNAME << "(): Error" << endl;
-        return kFailure;
+        // write_setに空のRecordを追加
+        write_set.insert(std::make_pair(id, Record()));
     }
     return kSuccess;
 }
@@ -649,21 +151,28 @@ int DataBase::deleteRecord(uint64_t id)
 // idを割り振るため、const Record &new_recordにしていない
 int DataBase::insertRecord(Record &new_record)
 {
-    // IDをセット
-    // setId2Record(new_record);
-    // Recordの制約チェック
-    if (checkRecord(new_record, CHECK_RECORD_OPTION_INSERT) == kFailure)
+    // primary_indexにもwrite_setにもないidをランダムで生成
+    uint64_t id = rnd();
+
+    auto primary_itr = primary_index.find(id);
+    auto write_set_itr = write_set.find(id);
+
+    while (primary_itr != primary_index.end() || write_set_itr != write_set.end() || id == Record::kIdNull)
     {
-        cerr << FUNCNAME << "(): Failed to insert Record" << endl;
+        id = rnd();
+        primary_itr = primary_index.find(id);
+        write_set_itr = write_set.find(id);
+    }
+
+    // write_setにidをセット
+    new_record.id = id;
+
+    if (checkRecord(new_record) == kFailure)
+    {
+        cerr << "Error: " << FUNCNAME << "(): checkRecord() error" << endl;
         return kFailure;
     }
-    // 完成図 : INSERT(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1f)(\x1e)
-    write_set << "INSERT\x1f";
-    for (const auto &[key, value] : new_record.columns)
-    {
-        write_set << key << '\x1f' << value << '\x1f';
-    }
-    write_set << '\x1e';
+    write_set[id] = new_record;
 
     return kSuccess;
 }
@@ -682,48 +191,114 @@ int DataBase::insertRecord(Record &new_record)
 */
 int DataBase::readRecord(const map<string, string> &target_columns, vector<Record> &return_records)
 {
+    /*
+    writeset検索
+    db検索
+    merge
+    x2
+
+    merge
+
+    x n-1 回
+    */
     // return_recordsの初期化
     return_records.clear();
-    // 絞り込んでいる最中/絞り込んだtableの添字の集合
-    vector<int> selected_table_index;
-    // 最初は、0~レコードの数まですべて
-    for (uint32_t i = 0; i < table_num; ++i)
-    {
-        selected_table_index.emplace_back(i);
-    }
 
-    // 複数の条件を、順番に確認していく
-    for (const auto &[column_name, column_value] : target_columns)
+    // 2つ用意して、mergeする
+    set<uint64_t> column_sets[2];
+    int i = 0;
+
+    for (const auto &column_name_value_pair : target_columns)
     {
-        // column_nameが存在するかチェック
-        // column_namesには、現在使われているcolumnの名前がすべて格納されている
-        if (column_names.count(column_name) == 1)
+        // write set検索
+        // write set(map型)内のRecordをすべて回す
+        // write_set_itr->second = write_set内のRecord
+        for (auto write_set_itr = write_set.begin(); write_set_itr != write_set.end(); ++write_set_itr)
         {
-            // 条件にあわないRecordの添字をselected_table_indexから消去していく
-            for (auto it = selected_table_index.begin(); it != selected_table_index.end(); ++it)
+            // Recordのcolumnsのcolumn_nameがcolumn_valueかどうか
+            // itrは、columnsのiterator
+            // if(auto itr = record.columns.find(column_name); itr != record.columns.end())
+            if (auto itr = write_set_itr->second.columns.find(column_name_value_pair.first); itr != write_set_itr->second.columns.end())
             {
-                // もし、値が一致しない場合は、条件に合っていないということ
-                if (table[*it].columns[column_name] != column_value)
+                // Record.column[column_name] == value
+                if (itr->second == column_name_value_pair.second)
                 {
-                    // selected_table_indexから削除
-                    selected_table_index.erase(it);
-                    --it;
+                    // column_sets[iが0なら0、それ以外なら1]に追加
+                    column_sets[i == 0].insert(write_set_itr->second.id);
                 }
+            }
+        }
+
+        // <column_name, column_value>のペアで、ID(複数・set型)を検索する
+        if (auto column_index_itr = column_index.find(column_name_value_pair); column_index_itr != column_index.end())
+        {
+            // column_index_itr->second(set型)から、順番にIDを抽出
+            for (auto const &id : column_index_itr->second)
+            {
+                // 抽出したidがwrite_setに存在するか
+                // write_setに存在する場合、なにもしない
+                if (auto write_set_itr = write_set.find(id); write_set_itr == write_set.end())
+                {
+                    // 存在しない場合のみ追加
+                    // i==0のとき0,それ以外の時1にする
+                    column_sets[i == 0].insert(id);
+                }
+            }
+            if (i == 0)
+            {
+                // iが0のときは飛ばす
+                continue;
             }
         }
         else
         {
-
-            // 存在しないcolumnの名前を指定された場合
-            cerr << "Error: " << FUNCNAME << "(): there is no column_name '" << column_name << "' in column_names" << endl;
+            // todo; keyが正しい場合は、パス
+            cerr << "Error: " << FUNCNAME << "(): column_name and value error" << endl;
             return kFailure;
         }
+        auto itr0 = column_sets[0].begin();
+        auto itr1 = column_sets[1].begin();
+        while (itr0 != column_sets[0].end() && itr1 != column_sets[1].end())
+        {
+            if (*itr0 == *itr1)
+            {
+                ++itr0;
+                ++itr1;
+                continue;
+            }
+            else if (*itr0 < *itr1)
+            {
+                // 小さいほうは、==になることはないので、消す
+                itr0 = column_sets[0].erase(itr0);
+            }
+            else
+            {
+                // *itr0 > *itr1
+                // 小さいほうは、==になることはないので飛ばす
+                // 保存するのは、itr0のほうだけ(消すのはもったないない)
+                ++itr1;
+            }
+        }
+        ++i;
     }
 
-    // return_recordsに、絞り込んだRecordを代入していく
-    for (auto it = selected_table_index.begin(); it != selected_table_index.end(); ++it)
+    for (auto const &id : column_sets[0])
     {
-        return_records.emplace_back(table[*it]);
+        if (auto write_set_itr = write_set.find(id); write_set_itr != write_set.end())
+        {
+            return_records.push_back(write_set_itr->second);
+        }
+        else
+        {
+            if (auto primary_index_itr = primary_index.find(id); primary_index_itr != primary_index.end())
+            {
+                return_records.push_back(primary_index_itr->second);
+            }
+            else
+            {
+                cerr << "Error " << FUNCNAME << "(): write set and primary_index; no id of " << id << endl;
+            }
+        }
     }
 
     return kSuccess;
@@ -732,21 +307,31 @@ int DataBase::readRecord(const map<string, string> &target_columns, vector<Recor
 // Idで指定したRecordをreturn_recordに代入する
 int DataBase::readRecord(uint64_t id, Record &return_record)
 {
-    if (id == Record::kIdNull)
-    {
-        cerr << FUNCNAME << "(): Error" << endl;
-        return kFailure;
-    }
 
-    if (auto iterator = primary_index.find(id); iterator != primary_index.end())
+    if (auto write_set_itr = write_set.find(id); write_set_itr != write_set.end())
     {
-        return_record = table[iterator->second];
-        return kSuccess;
+        // 削除済みの場合
+        if (write_set_itr->second.columns.empty())
+        {
+            return kFailure;
+        }
+        else
+        {
+            return_record = write_set_itr->second;
+        }
     }
     else
     {
-        cerr << FUNCNAME << "(): Error" << endl;
-        return kFailure;
+        if (auto iterator = primary_index.find(id); iterator != primary_index.end())
+        {
+            return_record = iterator->second;
+            return kSuccess;
+        }
+        else
+        {
+            cerr << FUNCNAME << "(): Error" << endl;
+            return kFailure;
+        }
     }
 }
 
@@ -757,13 +342,6 @@ int DataBase::readRecord(uint64_t id, Record &return_record)
 */
 int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
 {
-    // idが変更前と変更後で一致するかチェック
-    if (id != update_record_condition.id)
-    {
-        cerr << FUNCNAME << "(): id of target_record and update_record_condition is not same" << endl;
-        return kFailure;
-    }
-
     // update_record_conditionが制約に反していないかチェックする
     if (checkRecord(update_record_condition, CHECK_RECORD_OPTION_UPDATE) == kFailure)
     {
@@ -771,13 +349,8 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
         return kFailure;
     }
 
-    // idから、primary_indexを使って、table[]の添字を取得
     if (auto iterator = primary_index.find(id); iterator != primary_index.end())
     {
-        // 変更する対象の添字に、update_record_conditionを代入
-        return redoLog->addUpdateLog(table[iterator->second], update_record_condition);
-        // table[target_table_index_iterator->second] = update_record_condition;
-        // return kSuccess;
     }
     else
     {

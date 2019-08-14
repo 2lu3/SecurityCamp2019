@@ -7,6 +7,7 @@
 #include <random>
 #include <set>
 #include <sstream>
+#include <utility>
 
 /*  データベース設計
 1. Read, Insert, Update, Deleteを複数回実行
@@ -37,19 +38,15 @@ public:
 
     /*  制約
         1: idはユニークである
-        2: idは0以外である
+        2: idはkIdNull以外である
         3: columnsのkeyはすべてのRecordで共通でなければならない */
     struct Record
     {
+        Record();
         const static std::uint64_t kIdNull = 0;
-        const static std::string kValueNull;
-
         std::uint64_t id;
         std::map<std::string, std::string> columns;
-        Record();
     };
-    const static int table_max_num = 100; // 保持できるRecordの最大値(デバッグ用にpublicにおいているが、privateに移す予定)
-    Record table[table_max_num];          // データベースのデータそのもの(デバッグ用にpublicにおいているが、privateに移す予定)
 
     // 関数の戻り値で、成功を表す
     const static int kSuccess = 1;
@@ -92,15 +89,19 @@ private:
     std::stringstream write_set;
     std::random_device rnd;
 
-    const int CHECK_RECORD_OPTION_INSERT = 0;
-    const int CHECK_RECORD_OPTION_UPDATE = 1;
     // Recordが制約に収まっているかチェックする
-    int checkRecord(const Record &check_record, int option);
+    int checkRecord(const Record &check_record);
 
-    std::set<std::string> column_names{"name", "age"};
+    std::set<std::string> column_names = {"name", "age"};
 
     // id-tableの添字を格納する
-    std::map<std::uint64_t, std::uint32_t> primary_index;
+    std::map<std::uint64_t, Record> primary_index;
+    // update : write_setに書き換えたものを代入
+    // insert : primary_indexにないidを追加
+    // delete : map.size() = 0
+    std::map<std::uint64_t, Record> write_set;
+    // map<pair<column名, value>, set<id>> : keyを指定したうえで、valueからidを効率的に探す
+    std::map<std::pair<std::string, std::string>, std::set<std::uint64_t>> column_index;
 };
 
 class UndoLog
