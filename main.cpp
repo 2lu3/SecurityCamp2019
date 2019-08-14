@@ -52,7 +52,8 @@ int main()
         return 1;
     }
     string buffer;
-    while (std::getline(file, buffer))
+    int i = 0;
+    while (std::getline(file, buffer) && i < 5)
     {
         int first_split = buffer.find(',');
         int second_split = buffer.find(',', first_split + 1);
@@ -62,14 +63,27 @@ int main()
         record.columns["name"] = name;
         record.columns["age"] = age;
         dataBase.insertRecord(record);
+        ++i;
     }
 
     dataBase.commit();
+    dataBase.crashRecovery();
+
+    cout << "start " << endl;
+    for (auto &[name_value_pair, id_set] : dataBase.column_index)
+    {
+        for (auto &id : id_set)
+        {
+            cout << "name " << name_value_pair.first << " value " << name_value_pair.second << " id " << id << endl;
+        }
+    }
+    cout << "end" << endl;
 
     for (auto itr = dataBase.primary_index.begin(); itr != dataBase.primary_index.end(); ++itr)
     {
-        cout << itr->second.columns["name"] << " " << itr->second.columns["age"] << endl;
+        cout << "id " << itr->second.id << " " << itr->second.columns["name"] << " " << itr->second.columns["age"] << endl;
     }
+    return 0;
 
     vector<DataBase::Record> vec;
     dataBase.readRecord(record.columns, vec);

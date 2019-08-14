@@ -78,19 +78,19 @@ public:
     // new_recordのコピーをtableに追加する
     int insertRecord(Record &new_record);
 
-    // target_recordにまだ登録されていないIDを設定する
-    int setId2Record(Record &target_record);
-
     // 現在の、tableに格納されているRecordの数
     std::uint32_t table_num = 0;
 
     std::map<std::uint64_t, Record> primary_index;
+
+    std::map<std::pair<std::string, std::string>, std::set<std::uint64_t>> column_index;
 
 private:
     std::random_device rnd;
 
     // Recordが制約に収まっているかチェックする
     int checkRecord(const Record &check_record);
+    int setID2Record(Record &target_record);
 
     std::set<std::string> column_names = {"name", "age"};
 
@@ -100,7 +100,6 @@ private:
     // delete : map.size() = 0
     std::map<std::uint64_t, Record> write_set;
     // map<pair<column名, value>, set<id>> : keyを指定したうえで、valueからidを効率的に探す
-    std::map<std::pair<std::string, std::string>, std::set<std::uint64_t>> column_index;
 };
 
 #endif //SECURITYCAMP2019_DATABASE_HPP_

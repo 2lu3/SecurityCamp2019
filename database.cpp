@@ -19,6 +19,7 @@ using std::int64_t;
 using std::map;
 using std::ofstream;
 using std::set;
+using std::stoull;
 using std::string;
 using std::stringstream;
 using std::to_string;
@@ -91,6 +92,51 @@ int DataBase::checkRecord(const Record &check_record)
 int DataBase::commit()
 {
     // todo : ファイル書き込み
+    ofstream file("redo.log", std::ios::out);
+
+    if (!file)
+    {
+        cerr << "Error: " << FUNCNAME << "(): can not open file";
+        return kFailure;
+    }
+
+    for (auto write_set_itr = write_set.begin(); write_set_itr != write_set.end(); ++write_set_itr)
+    {
+        const uint64_t &id = write_set_itr->first;
+        const Record &record = write_set_itr->second;
+
+        if (record.columns.empty())
+        {
+            // delete
+            // 完成図 : D(\x1f)D(\x1f)(\x1e)
+            file << "D\x1f" << id << '\x1f' << '\x1e';
+        }
+        else if (auto primary_index_itr = primary_index.find(id); primary_index_itr != primary_index.end())
+        {
+            // primary_indexに登録されている場合
+            // update
+            // 完成図 : U(\x1f)id(\x1f)key(\x1f)value(\x1f)...value(\x1f)(\x1e)
+            file << "U\x1f" << id << '\x1f';
+            for (const auto &[column_name, column_value] : record.columns)
+            {
+                file << column_name << '\x1f' << column_value << '\x1f';
+            }
+            file << '\x1e';
+        }
+        else
+        {
+            // insert
+            // 完成図 : I(\x1f)id(\x1f)key(\x1f)value(\x1f)...value(\x1f)(\x1e)
+            file << "I\x1f" << id << '\x1f';
+            for (const auto &[column_name, column_value] : record.columns)
+            {
+                file << column_name << '\x1f' << column_value << '\x1f';
+            }
+            file << '\x1e';
+        }
+    }
+    file << "CS\x1e" << flush;
+    return kFailure;
 
     // write_setの内容をprimary_indexに反映する
     for (auto write_set_itr = write_set.begin(); write_set_itr != write_set.end(); ++write_set_itr)
@@ -121,18 +167,148 @@ int DataBase::commit()
         }
     }
 
+    file.close();
+
+    file << "CF\x1e" << flush;
+
+    file = ofstream("redo.log", std::ios::out);
+
     return kSuccess;
 }
 
 int DataBase::abort()
 {
     // ファイルの内容を破棄するだけ
+    ofstream file("redo.log", std::ios::out);
     return kSuccess;
 }
 
 // 未実装
 int DataBase::crashRecovery()
 {
+    ifstream file("redo.log", std::ios::in);
+    if (!file)
+    {
+        cerr << "Error: " << FUNCNAME << "(): Failed to load file" << endl;
+        return kFailure;
+    }
+    stringstream sstream;
+    sstream << file.rdbuf();
+
+    file.close();
+
+    string message;
+    while (std::getline(sstream, message, '\x1e'))
+    {
+
+        if (message[0] == 'D')
+        {
+            // 区切り文字の左と右の位置
+            int start_pos = 2, end_pos = -1;
+            Record record;
+
+            // IDの取得
+            end_pos = message.find('\x1f', start_pos + 1);
+            cout << message << endl;
+            cout << message.substr(start_pos + 1, end_pos - start_pos - 1) << endl;
+            uint64_t id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
+            start_pos = end_pos;
+
+            record.id = id;
+
+            string key, value;
+
+            int message_size = message.size();
+            do
+            {
+                end_pos = message.find('\x1f', start_pos + 1);
+                key = message.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+
+                end_pos = message.find('\x1f', start_pos + 1);
+                value = message.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+                record.columns[key] = value;
+                cout << start_pos << " " << end_pos << "key " << key << " value " << value << endl;
+            } while (end_pos < message_size - 1);
+        }
+        else if (message.substr(0, 2) == "CS")
+        {
+        }
+        else if (message.substr(0, 2) == "CF")
+        {
+        }
+        else if (message[0] == 'U' || message[0] == 'I')
+        {
+            // insert or update
+
+            // recordの情報を読み込み
+            // 区切り文字の左と右の位置
+            int start_pos = 2, end_pos = -1;
+            Record record;
+
+            // IDの取得
+            end_pos = message.find('\x1f', start_pos + 1);
+            uint64_t id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
+            start_pos = end_pos;
+
+            record.id = id;
+
+            string key, value;
+
+            int message_size = message.size();
+            do
+            {
+                end_pos = message.find('\x1f', start_pos + 1);
+                key = message.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+
+                end_pos = message.find('\x1f', start_pos + 1);
+                value = message.substr(start_pos + 1, end_pos - start_pos - 1);
+                start_pos = end_pos;
+                record.columns[key] = value;
+            } while (end_pos < message_size - 1);
+
+            if (message[0] == 'U')
+            {
+                // update
+            }
+            else
+            {
+                // insert
+                // primary_indexに追加
+                if (auto primary_index_itr = primary_index.find(id); primary_index_itr != primary_index.end())
+                {
+                    // 登録されている場合
+                    setID2Record(record);
+                }
+                primary_index[record.id] = record;
+
+                // column_indexにも追加
+                for (const auto &column_name_value_pair : record.columns)
+                {
+
+                    if (auto column_index_itr = column_index.find(column_name_value_pair);
+                        column_index_itr != column_index.end())
+                    {
+                        // すでに登録されている場合
+                        column_index_itr->second.insert(record.id);
+                    }
+                    else
+                    {
+                        // 登録されていない場合
+                        column_index.insert(std::make_pair(column_name_value_pair, std::set<uint64_t>{record.id}));
+                    }
+                }
+            }
+        }
+        else
+        {
+            cerr << "undefined command " << message << endl;
+            return kFailure;
+        }
+    }
+
     return kSuccess;
 }
 
@@ -161,9 +337,7 @@ int DataBase::deleteRecord(uint64_t id)
     return kSuccess;
 }
 
-// table[]の末尾に新しいRecordを追加
-// idを割り振るため、const Record &new_recordにしていない
-int DataBase::insertRecord(Record &new_record)
+int DataBase::setID2Record(Record &target_record)
 {
     // primary_indexにもwrite_setにもないidをランダムで生成
     uint64_t id = rnd();
@@ -178,15 +352,22 @@ int DataBase::insertRecord(Record &new_record)
         write_set_itr = write_set.find(id);
     }
 
-    // write_setにidをセット
-    new_record.id = id;
+    // idをセット
+    target_record.id = id;
+    return kSuccess;
+}
 
+// table[]の末尾に新しいRecordを追加
+// idを割り振るため、const Record &new_recordにしていない
+int DataBase::insertRecord(Record &new_record)
+{
+    setID2Record(new_record);
     if (checkRecord(new_record) == kFailure)
     {
         cerr << "Error: " << FUNCNAME << "(): checkRecord() error" << endl;
         return kFailure;
     }
-    write_set[id] = new_record;
+    write_set[new_record.id] = new_record;
 
     return kSuccess;
 }
