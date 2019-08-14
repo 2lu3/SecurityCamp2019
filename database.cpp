@@ -40,6 +40,8 @@ DataBase::DataBase()
 // 未実装
 int DataBase::begin()
 {
+    // redologの初期化
+    ofstream file = ofstream("redo.log", std::ios::out);
     return kSuccess;
 }
 
@@ -88,17 +90,8 @@ int DataBase::checkRecord(const Record &check_record)
     return kSuccess;
 }
 
-int DataBase::commit()
+int DataBase::saveWriteSet2RedoLog(const ofstream &file)
 {
-    // todo : ファイル書き込み
-    ofstream file("redo.log", std::ios::out);
-
-    if (!file)
-    {
-        cerr << "Error: " << FUNCNAME << "(): can not open file";
-        return kFailure;
-    }
-
     for (auto write_set_itr = write_set.begin(); write_set_itr != write_set.end(); ++write_set_itr)
     {
         const uint64_t &id = write_set_itr->first;
@@ -134,10 +127,11 @@ int DataBase::commit()
             file << '\x1e';
         }
     }
-    file << "CS\x1e" << flush;
-    return kFailure;
+    return kSuccess;
+}
 
-    // write_setの内容をprimary_indexに反映する
+int DataBase::updatePrimaryIndexFromWriteSet()
+{
     for (auto write_set_itr = write_set.begin(); write_set_itr != write_set.end(); ++write_set_itr)
     {
         const auto &selected_record = write_set_itr->second;
@@ -165,12 +159,30 @@ int DataBase::commit()
             primary_index[id] = selected_record;
         }
     }
+}
 
+int DataBase::commit()
+{
+    // todo : ファイル書き込み
+    ofstream file("redo.log", std::ios::out);
+
+    if (!file)
+    {
+        cerr << "Error: " << FUNCNAME << "(): can not open file";
+        return kFailure;
+    }
+
+    saveWriteSet2RedoLog(file);
+    // commit start
+    file << "CS\x1e" << flush;
     file.close();
 
-    file << "CF\x1e" << flush;
+    // write_setの内容をprimary_indexに反映する
+    updatePrimaryIndexFromWriteSet();
 
-    file = ofstream("redo.log", std::ios::out);
+    // Commit Finish
+    // これがない場合、redologの内容はcrash_recorveryで実行しない
+    file << "CF\x1e" << flush;
 
     return kSuccess;
 }

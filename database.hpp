@@ -91,6 +91,8 @@ private:
     // Recordが制約に収まっているかチェックする
     int checkRecord(const Record &check_record);
     int setID2Record(Record &target_record);
+    int saveWriteSet2RedoLog(const std::ofstream &file);
+    int updatePrimaryIndexFromWriteSet();
 
     std::set<std::string> column_names = {"name", "age"};
 
