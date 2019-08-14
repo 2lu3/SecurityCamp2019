@@ -90,7 +90,7 @@ int DataBase::checkRecord(const Record &check_record)
     return kSuccess;
 }
 
-int DataBase::saveWriteSet2RedoLog(const ofstream &file)
+int DataBase::saveWriteSet2RedoLog(ofstream &file)
 {
     for (auto write_set_itr = write_set.begin(); write_set_itr != write_set.end(); ++write_set_itr)
     {
