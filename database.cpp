@@ -34,6 +34,7 @@ RedoLog::RedoLog()
 {
 }
 
+// redo.logを初期化する
 int RedoLog::resetLogFile()
 {
     ofstream file(log_file_name, std::ios::out);
@@ -62,6 +63,7 @@ int RedoLog::readRedoLog(stringstream &buffer)
     return kSuccess;
 }
 
+// commitを開始したというメッセージをredo.logに出力する
 int RedoLog::commitStart()
 {
     ofstream file(log_file_name);
@@ -190,18 +192,15 @@ DataBase::Record::Record()
 
 DataBase::DataBase() : redoLog(new RedoLog)
 {
-    FILE *fp = fopen("data.csv", "r");
-    if (fp == NULL)
-    {
-        cout << "ファイルが開きません" << endl;
-    }
-    fclose(fp);
 }
 
+// 未実装
 int DataBase::begin()
 {
     return kSuccess;
 }
+
+// 未実装
 int DataBase::createKey(std::string columns[])
 {
     cout << columns[0] << endl;
@@ -303,6 +302,7 @@ int DataBase::commit()
         if (command[0] == 'I')
         {
             // insert
+            // 完成図 : INSERT(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1f)(\x1e)
             Record record;
             // 区切り文字のある番号(添字)
             // substrで、start_posからend_posまでを切り出す
@@ -352,6 +352,9 @@ int DataBase::commit()
         else if (command[0] == 'U')
         {
             // update
+            // 完成図 : UPDATE(\x1f)id(\x1f)変更するkey(\x1f)変更するvalue(\x1f)...(\x1f)変更するkey(\x1f)変更するvalue(\x1f)(\x1e)
+            // RedoLogの内容
+
             // 区切り文字のある番号(添字)
             // substrで、start_posからend_posまでを切り出す
             // start: 左側
@@ -407,6 +410,7 @@ int DataBase::commit()
         else if (command[0] == 'D')
         {
             // delete
+            // 完成図 : DELETE(\x1f)id(\x1e)
             Record record;
             // 区切り文字のある番号(添字)
             // substrで、start_posからend_posまでを切り出す
@@ -440,6 +444,8 @@ int DataBase::commit()
         }
         else if (command == redoLog->commit_start_message)
         {
+            // commit startメッセージ
+            // 正常終了
             return redoLog->resetLogFile();
         }
         else
@@ -453,12 +459,15 @@ int DataBase::commit()
     return kFailure;
 }
 
+
 int DataBase::abort()
 {
+    // ファイルの内容を破棄するだけ
     redoLog->resetLogFile();
     return kSuccess;
 }
 
+// 未実装
 int DataBase::crashRecovery()
 {
     stringstream buffer;
