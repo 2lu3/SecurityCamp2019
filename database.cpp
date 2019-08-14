@@ -186,12 +186,14 @@ int DataBase::abort()
 // 未実装
 int DataBase::crashRecovery()
 {
+    int is_redolog_output_finished = 0;
     ifstream file("redo.log", std::ios::in);
     if (!file)
     {
         cerr << "Error: " << FUNCNAME << "(): Failed to load file" << endl;
         return kFailure;
     }
+    // string
     stringstream sstream;
     sstream << file.rdbuf();
 
@@ -205,38 +207,17 @@ int DataBase::crashRecovery()
         {
             // 区切り文字の左と右の位置
             int start_pos = 2, end_pos = -1;
-            Record record;
 
             // IDの取得
             end_pos = message.find('\x1f', start_pos + 1);
-            cout << message << endl;
-            cout << message.substr(start_pos + 1, end_pos - start_pos - 1) << endl;
             uint64_t id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
-            start_pos = end_pos;
-
-            record.id = id;
-
-            string key, value;
-
-            int message_size = message.size();
-            do
-            {
-                end_pos = message.find('\x1f', start_pos + 1);
-                key = message.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-
-                end_pos = message.find('\x1f', start_pos + 1);
-                value = message.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-                record.columns[key] = value;
-                cout << start_pos << " " << end_pos << "key " << key << " value " << value << endl;
-            } while (end_pos < message_size - 1);
         }
         else if (message.substr(0, 2) == "CS")
         {
         }
         else if (message.substr(0, 2) == "CF")
         {
+            is_redolog_output_finished = 1;
         }
         else if (message[0] == 'U' || message[0] == 'I')
         {
