@@ -71,6 +71,8 @@ int DataBase::checkRecord(const Record &check_record)
 
     // 順番にkeyが一致するかを調べる
     // 初期化式の中で、for(auto column_names_iterator = column_names.begin(), auto column_iterator = check_record.columns.begin())とするとエラーが出る
+    // for 文の初期化式はひとつしか許されないようです。int a, b; はひとつの初期化式ですが 2 つの変数を宣言できます。つまり、同一の型の変数に限り複数宣言できるということですね。
+    // column_names と check_record.columns は型が異なるので無理ですね。
     auto column_names_iterator = column_names.begin();
     auto column_iterator = check_record.columns.begin();
     for (;
@@ -88,6 +90,8 @@ int DataBase::checkRecord(const Record &check_record)
     return kSuccess;
 }
 
+
+// この関数の中身がちょっと整理したい。具体的には処理
 int DataBase::commit()
 {
     // todo : ファイル書き込み

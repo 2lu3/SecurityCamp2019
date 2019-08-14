@@ -1,6 +1,10 @@
 #ifndef SECURITYCAMP2019_DATABASE_HPP_
 #define SECURITYCAMP2019_DATABASE_HPP_
 
+
+// C++: #ifndef よりも #pragma once を推奨します。
+
+
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -40,19 +44,23 @@ public:
         3: columnsのkeyはすべてのRecordで共通でなければならない */
     struct Record
     {
-        Record()
+        Record() : id(kIdNull), columns()
         {
-            id = kIdNull;
         }
         const static std::uint64_t kIdNull = 0;
         std::uint64_t id;
         std::map<std::string, std::string> columns;
+
+        // 例えば using Columns = std::map<std::string, std::string>; とすることで、以後 Columns 型として使えるようになる。
+        // Record の中で定義すると名前空間がかなり入れ子になってしまうので、DataBase の中か、外でも良いと思う。
     };
 
     // 関数の戻り値で、成功を表す
     const static int kSuccess = 1;
     // 関数の戻り値で、失敗を表す
     const static int kFailure = 0;
+    // c++: int 型である理由が分からない。成功失敗を返すだけであれば bool 型で良いのでは。
+
 
     int crashRecovery();                  // 未実装
     int begin();                          // 未実装
@@ -72,11 +80,15 @@ public:
 
     // target_columnsで指定した条件に合うRecordを返す
     int readRecord(const std::map<std::string, std::string> &target_columns, std::vector<Record> &return_records);
+    // ここを const Columns &target_columns とできる。
+
     // idで指定したRecordを返す
     int readRecord(std::uint64_t id, Record &return_record);
 
     // new_recordのコピーをtableに追加する
     int insertRecord(Record &new_record);
+    // C++: コピーするなら const Record& で受ける。
+    // ムーヴするなら Record&& で受けることで無駄が減る。(参考情報)
 
     // target_recordにまだ登録されていないIDを設定する
     int setId2Record(Record &target_record);
@@ -85,9 +97,11 @@ public:
     std::uint32_t table_num = 0;
 
     std::map<std::uint64_t, Record> primary_index;
+     // 多用するならこれも using PrimaryIndex = ... などと型の別名を付ける。
 
 private:
     std::random_device rnd;
+    // C++: 典型的には random_device は直接使わない。
 
     // Recordが制約に収まっているかチェックする
     int checkRecord(const Record &check_record);
@@ -99,8 +113,14 @@ private:
     // insert : primary_indexにないidを追加
     // delete : map.size() = 0
     std::map<std::uint64_t, Record> write_set;
+    // map.size() = 0 ？？？ deleted 状態をどのように表現するのかピンと来ず。
+    // あー Record::columns.size() が 0 ということですか。。確かに区別できるけど、ちょっと特殊な状態に意味を与えすぎ感が。。。
+    // 素直に UPDATE, INSERT, DELETE の enum を用意した方が分かりやすいといえば分かりやすいですね。。
+
     // map<pair<column名, value>, set<id>> : keyを指定したうえで、valueからidを効率的に探す
     std::map<std::pair<std::string, std::string>, std::set<std::uint64_t>> column_index;
+    // これは型に別名を付けましょう。さすがに長すぎ。
+
 };
 
 #endif //SECURITYCAMP2019_DATABASE_HPP_

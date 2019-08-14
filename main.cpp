@@ -14,6 +14,10 @@ using std::map;
 using std::string;
 using std::vector;
 
+// using namespace std; で std 名前空間(宣言したモジュール内で)まとめて省略できるようになります。
+// しかし、std:: を省略するのはあまりオススメしません。
+
+
 /*
 1. read, update, delete, insert
 
@@ -73,10 +77,14 @@ int main()
 
     vector<DataBase::Record> vec;
     dataBase.readRecord(record.columns, vec);
+    // record.columns を渡す理由。record を渡してはダメなのか。
+
 
     // dataBase.deleteRecord(vec[0]);
 
     dataBase.commit();
+    // ここで commit を呼ぶ理由。
+
 
     // dataBase.readRecord(record2.columns, vec);
 
