@@ -18,11 +18,11 @@ int main()
     DataBase::Record record1, record2;
 
     // Recordの追加(x 2)
-    record1.columns["name"] = "山田";
+    record1.columns["name"] = "Yamada";
     record1.columns["age"] = "12";
     dataBase.insertRecord(record1);
 
-    record2.columns["name"] = "田中";
+    record2.columns["name"] = "Tanaka";
     record2.columns["age"] = "24";
     dataBase.insertRecord(record2);
 
@@ -31,6 +31,14 @@ int main()
     vector<DataBase::Record> vec;
     dataBase.readRecord(record1.columns, vec);
     dataBase.deleteRecord(vec[0]);
+
+    dataBase.commit();
+
+    dataBase.readRecord(record2.columns, vec);
+
+    DataBase::Record record3 = vec[0];
+    record3.columns["name"] = "zyugemuzyugemu";
+    dataBase.updateRecord(vec[0], record3);
 
     dataBase.commit();
     std::string message;

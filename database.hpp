@@ -118,6 +118,7 @@ public:
     int addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record);
     // Deleteを記録する
     int addDeleteLog(std::uint64_t id);
+    int commitStart();
 
     int readRedoLog(std::stringstream &buffer);
 
@@ -125,6 +126,8 @@ public:
 
     const static int kSuccess = DataBase::kSuccess; // 成功を示す関数の戻り値
     const static int kFaliure = DataBase::kFailure; // 失敗を示す関数の戻り値
+
+    const std::string commit_start_message = "commitstart";
 
 private:
     const char log_file_name[10] = "redo.log";

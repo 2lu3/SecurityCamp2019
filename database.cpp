@@ -62,6 +62,19 @@ int RedoLog::readRedoLog(stringstream &buffer)
     return kSuccess;
 }
 
+int RedoLog::commitStart()
+{
+    ofstream file(log_file_name);
+    if (!file)
+    {
+        cerr << FUNCNAME << "(): Error" << endl;
+        return kFaliure;
+    }
+
+    file << commit_start_message << flush;
+    return kSuccess;
+}
+
 /* RedoLog Delete Insert Update */
 
 // DeleteのRedoLogをredo.logに記録する
@@ -92,12 +105,12 @@ int RedoLog::addDeleteLog(uint64_t id)
 // InsertのRedoLogをredo.logに記録する
 int RedoLog::addInsertLog(const DataBase::Record &record)
 {
-    // 完成図 : INSERT(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1e)
-    string log_message = "INSERT";
+    // 完成図 : INSERT(\x1f)key(\x1f)value(\x1f)...(\x1f)key(\x1f)value(\x1f)(\x1e)
+    string log_message = "INSERT\x1f";
 
     for (const auto &[key, value] : record.columns)
     {
-        log_message += '\x1f' + key + '\x1f' + value;
+        log_message += key + '\x1f' + value + '\x1f';
     }
     log_message += '\x1e';
 
@@ -124,9 +137,9 @@ int RedoLog::addInsertLog(const DataBase::Record &record)
 // UpdateのRedoLogをredo.logに記録する
 int RedoLog::addUpdateLog(const DataBase::Record &before_record, const DataBase::Record &updated_record)
 {
-    // 完成図 : UPDATE(\x1f)id(\x1f)変更するkey(\x1f)変更するvalue(\x1f)...(\x1f)変更するkey(\x1f)変更するvalue(\x1e)
+    // 完成図 : UPDATE(\x1f)id(\x1f)変更するkey(\x1f)変更するvalue(\x1f)...(\x1f)変更するkey(\x1f)変更するvalue(\x1f)(\x1e)
     // RedoLogの内容
-    string log_message = "UPDATE\x1f" + to_string(updated_record.id);
+    string log_message = "UPDATE\x1f" + to_string(updated_record.id) + '\x1f';
 
     // before_recordとupdate_recordのcolumnのvalueを順番に比較する
     auto before_record_iterator = before_record.columns.begin();
@@ -139,8 +152,8 @@ int RedoLog::addUpdateLog(const DataBase::Record &before_record, const DataBase:
         if (before_record_iterator->second != updated_record_iterator->second)
         {
             // valueが一致しない場合、変更されている
-            // log_message += (\x1f)key(\x1f)value
-            log_message += '\x1f' + updated_record_iterator->first + '\x1f' + updated_record_iterator->second;
+            // log_message = (\x1f)key(\x1f)value
+            log_message += updated_record_iterator->first + '\x1f' + updated_record_iterator->second + '\x1f';
         }
     }
     log_message += '\x1e';
@@ -236,6 +249,7 @@ int DataBase::checkRecord(const Record &check_record, int option)
     {
         if (check_record.id == Record::kIdNull)
         {
+            cerr << "Error: " << FUNCNAME << "(): ID = 0" << endl;
             return kFailure;
         }
     }
@@ -247,6 +261,7 @@ int DataBase::checkRecord(const Record &check_record, int option)
     if (column_names.size() != check_record.columns.size())
     {
         // 要素数が違う場合、等価でない
+        cerr << "Error: " << FUNCNAME << "(): column_names.size() != columns.size()" << endl;
         return kFailure;
     }
 
@@ -261,6 +276,7 @@ int DataBase::checkRecord(const Record &check_record, int option)
         // column_namesのkey と columnのkeyが一致していない場合
         if (*column_names_iterator != column_iterator->first)
         {
+            cerr << "Error: " << FUNCNAME << "(): column_name(" << *column_names_iterator << ") != columns(" << column_iterator->first << ")";
             return kFailure;
         }
     }
@@ -270,6 +286,7 @@ int DataBase::checkRecord(const Record &check_record, int option)
 
 int DataBase::commit()
 {
+    redoLog->commitStart();
     // 個々のコマンドを順番に格納する
     // 例: INSERT key value ...
     string command;
@@ -283,7 +300,6 @@ int DataBase::commit()
     // 順番にアクセスする(コマンドごとの区切り文字は0x1e)
     while (std::getline(buffer, command, '\x1e'))
     {
-
         if (command[0] == 'I')
         {
             // insert
@@ -295,6 +311,7 @@ int DataBase::commit()
             // end: 右側
             size_t end_pos = -1;
             string key, value;
+            auto command_size = command.size();
             do
             {
                 // keyの取り出し
@@ -309,20 +326,20 @@ int DataBase::commit()
 
                 // key-valueの保存
                 record.columns[key] = value;
-            } while (end_pos != SIZE_MAX);
+            } while (end_pos != command_size - 1);
 
             // IDを設定
             setId2Record(record);
             // Recordの要件をチェック
             if (checkRecord(record, CHECK_RECORD_OPTION_INSERT) == kFailure)
             {
-                cerr << FUNCNAME << "():Error" << endl;
+                cerr << "Error: " << FUNCNAME << "(): check record error" << endl;
                 return kFailure;
             }
 
             if (table_num == table_max_num)
             {
-                cerr << FUNCNAME << "(): Error" << endl;
+                cerr << "Error: " << FUNCNAME << "(): table num error" << endl;
                 return kFailure;
             }
             // データの追加
@@ -335,7 +352,6 @@ int DataBase::commit()
         else if (command[0] == 'U')
         {
             // update
-            Record record;
             // 区切り文字のある番号(添字)
             // substrで、start_posからend_posまでを切り出す
             // start: 左側
@@ -347,9 +363,15 @@ int DataBase::commit()
             end_pos = command.find('\x1f', start_pos + 1);
             uint64_t id = std::stoi(command.substr(start_pos + 1, end_pos - start_pos - 1));
 
+            start_pos = end_pos;
+
+            // tableでの添字
+            uint32_t table_index;
+
+            // primary_index = map<id, table_index>
             if (auto iterator = primary_index.find(id); iterator != primary_index.end())
             {
-                record = table[iterator->second];
+                table_index = iterator->second;
             }
             else
             {
@@ -359,6 +381,7 @@ int DataBase::commit()
 
             string key, value;
 
+            auto command_size = command.size();
             do
             {
                 // keyの取り出し
@@ -370,9 +393,12 @@ int DataBase::commit()
                 end_pos = command.find('\x1f', start_pos + 1);
                 value = command.substr(start_pos + 1, end_pos - start_pos - 1);
                 start_pos = end_pos;
-            } while (end_pos != SIZE_MAX);
 
-            if (checkRecord(record, CHECK_RECORD_OPTION_UPDATE) == kFailure)
+                // key-valueの代入
+                table[table_index].columns[key] = value;
+            } while (end_pos != command_size - 1);
+
+            if (checkRecord(table[table_index], CHECK_RECORD_OPTION_UPDATE) == kFailure)
             {
                 cerr << FUNCNAME << "(): Error" << endl;
                 return kFailure;
@@ -393,6 +419,9 @@ int DataBase::commit()
 
             if (auto iterator = primary_index.find(id); iterator != primary_index.end())
             {
+                // primary_indexから対象のidを削除
+                primary_index.erase(id);
+                // for(int i = table_index + 1; i < table_num)
                 for (uint32_t i = iterator->second + 1; i < table_num; ++i)
                 {
                     // tableの更新
@@ -400,6 +429,7 @@ int DataBase::commit()
                     // primary_indexの更新
                     primary_index[table[i - 1].id] = i - 1;
                 }
+
                 --table_num;
             }
             else
@@ -408,15 +438,19 @@ int DataBase::commit()
                 return kFailure;
             }
         }
+        else if (command == redoLog->commit_start_message)
+        {
+            return redoLog->resetLogFile();
+        }
         else
         {
             // error
-            cerr << FUNCNAME << "(): Error" << endl;
+            cerr << "Error: " << FUNCNAME << "(): undefined command " << command << endl;
             return kFailure;
         }
-        // cout << command << endl;
     }
-    return redoLog->resetLogFile();
+    cerr << "there is no commit start message" << endl;
+    return kFailure;
 }
 
 int DataBase::abort()
@@ -429,6 +463,7 @@ int DataBase::crashRecovery()
 {
     stringstream buffer;
     redoLog->readRedoLog(buffer);
+    string command;
     while (std::getline(buffer, command, '\x1e'))
     {
 
@@ -630,6 +665,8 @@ int DataBase::insertRecord(Record &new_record)
 */
 int DataBase::readRecord(const map<string, string> &target_columns, vector<Record> &return_records)
 {
+    // return_recordsの初期化
+    return_records.clear();
     // 絞り込んでいる最中/絞り込んだtableの添字の集合
     vector<int> selected_table_index;
     // 最初は、0~レコードの数まですべて
@@ -713,7 +750,7 @@ int DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
     // update_record_conditionが制約に反していないかチェックする
     if (checkRecord(update_record_condition, CHECK_RECORD_OPTION_UPDATE) == kFailure)
     {
-        cerr << FUNCNAME << "(): Error" << endl;
+        cerr << "Error: " << FUNCNAME << "(): Check Record Error" << endl;
         return kFailure;
     }
 
