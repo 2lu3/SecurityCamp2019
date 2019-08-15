@@ -159,6 +159,7 @@ int DataBase::updatePrimaryIndexFromWriteSet()
             primary_index[id] = selected_record;
         }
     }
+    return kSuccess;
 }
 
 int DataBase::commit()
@@ -194,10 +195,128 @@ int DataBase::abort()
     return kSuccess;
 }
 
+int DataBase::createWriteSetWithCheck(stringstream &sstream)
+{
+    /* sstreamの完成図 */
+    /*
+    CS(\x1e)
+    命令文
+    I(\x1f)id(\x1f)key(\x1f)value(\x1f)key(...)value(\x1f)(\x1e)(実際には改行文字なし)
+    U(\x1f)id(\x1f)key(\x1f)value(\x1f)key(...)value(\x1f)(\x1e)(実際には改行文字なし)
+    D(\x1f)id(\x1f)(実際には改行文字なし)
+    の繰り返し
+    CF(\x1e)
+    */
+    int is_redolog_output_finished = -1;
+    string message;
+    // redo.logの命令文単位での区切り文字は、0x1e
+    while (std::getline(sstream, message, '\x1e'))
+    {
+
+        if (is_redolog_output_finished == -1)
+        {
+            if (message.substr(0, 2) != "CS")
+            {
+                // 上の完成図参照
+                // CSで始まらないredo.logは壊れている
+                return kFailure;
+            }
+        }
+        else if (message.substr(0, 2) == "CF")
+        {
+            // commit end
+            // これがない場合、redo.logは壊れている
+            is_redolog_output_finished = 1;
+        }
+        else if (message[0] == 'D' || message[0] == 'U' || message[0] == 'I')
+        {
+            // 区切り文字の左と右の位置
+            int start_pos = 2, end_pos = -1;
+
+            // IDの取得
+            end_pos = message.find('\x1f', start_pos + 1);
+            uint64_t id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
+            if (message[0] == 'D')
+            {
+                // delete
+
+                // write_setへのdelete命令
+                write_set.insert(std::make_pair(id, Record(id)));
+            }
+            else
+            {
+                // insert or update
+
+                Record record;
+                record.id = id;
+
+                // keyとvalueの読み込み
+                string key, value;
+                int message_size = message.size();
+                do
+                {
+                    // key
+                    end_pos = message.find('\x1f', start_pos + 1);
+                    key = message.substr(start_pos + 1, end_pos - start_pos - 1);
+                    start_pos = end_pos;
+
+                    // value
+                    end_pos = message.find('\x1f', start_pos + 1);
+                    value = message.substr(start_pos + 1, end_pos - start_pos - 1);
+                    start_pos = end_pos;
+                    record.columns[key] = value;
+                } while (end_pos < message_size - 1);
+
+                // updateとinsertで分岐
+                if (message[0] == 'U')
+                {
+                    // update
+                    if (auto primary_index_itr = primary_index.find(id); primary_index_itr != primary_index.end())
+                    {
+                        // primary_indexに追加済みの場合
+                        if (checkRecord(record) == kFailure)
+                        {
+                            return kFailure;
+                        }
+                        write_set[id] = record;
+                    }
+                    else
+                    {
+                        // primary_indexに追加されていない場合
+                        return kFailure;
+                    }
+                }
+                else
+                {
+                    // insert
+
+                    if (auto primary_index_itr = primary_index.find(id); primary_index_itr != primary_index.end())
+                    {
+                        // そのidがすでにprimary_indexに登録されている場合
+                        setID2Record(record);
+                    }
+
+                    if (checkRecord(record) == kFailure)
+                    {
+                        return kFailure;
+                    }
+
+                    write_set.insert(std::make_pair(record.id, record));
+                }
+            }
+        }
+        else
+        {
+            cerr << "undefined command " << message << endl;
+            return kFailure;
+        }
+    }
+    return kSuccess;
+}
+
 // 未実装
 int DataBase::crashRecovery()
 {
-    int is_redolog_output_finished = 0;
     ifstream file("redo.log", std::ios::in);
     if (!file)
     {
@@ -210,98 +329,13 @@ int DataBase::crashRecovery()
 
     file.close();
 
-    string message;
-    while (std::getline(sstream, message, '\x1e'))
+    // redo.logの操作が不正でないかのチェックと、redo.logの内容をwrite_setに変換する
+    if (createWriteSetWithCheck(sstream) == kFailure)
     {
-
-        if (message[0] == 'D')
-        {
-            // 区切り文字の左と右の位置
-            int start_pos = 2, end_pos = -1;
-
-            // IDの取得
-            end_pos = message.find('\x1f', start_pos + 1);
-            uint64_t id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
-        }
-        else if (message.substr(0, 2) == "CS")
-        {
-        }
-        else if (message.substr(0, 2) == "CF")
-        {
-            is_redolog_output_finished = 1;
-        }
-        else if (message[0] == 'U' || message[0] == 'I')
-        {
-            // insert or update
-
-            // recordの情報を読み込み
-            // 区切り文字の左と右の位置
-            int start_pos = 2, end_pos = -1;
-            Record record;
-
-            // IDの取得
-            end_pos = message.find('\x1f', start_pos + 1);
-            uint64_t id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
-            start_pos = end_pos;
-
-            record.id = id;
-
-            string key, value;
-
-            int message_size = message.size();
-            do
-            {
-                end_pos = message.find('\x1f', start_pos + 1);
-                key = message.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-
-                end_pos = message.find('\x1f', start_pos + 1);
-                value = message.substr(start_pos + 1, end_pos - start_pos - 1);
-                start_pos = end_pos;
-                record.columns[key] = value;
-            } while (end_pos < message_size - 1);
-
-            if (message[0] == 'U')
-            {
-                // update
-            }
-            else
-            {
-                // insert
-                // primary_indexに追加
-                if (auto primary_index_itr = primary_index.find(id); primary_index_itr != primary_index.end())
-                {
-                    // 登録されている場合
-                    setID2Record(record);
-                }
-                primary_index[record.id] = record;
-
-                // column_indexにも追加
-                for (const auto &column_name_value_pair : record.columns)
-                {
-
-                    if (auto column_index_itr = column_index.find(column_name_value_pair);
-                        column_index_itr != column_index.end())
-                    {
-                        // すでに登録されている場合
-                        column_index_itr->second.insert(record.id);
-                    }
-                    else
-                    {
-                        // 登録されていない場合
-                        column_index.insert(std::make_pair(column_name_value_pair, std::set<uint64_t>{record.id}));
-                    }
-                }
-            }
-        }
-        else
-        {
-            cerr << "undefined command " << message << endl;
-            return kFailure;
-        }
+        return kFailure;
     }
 
-    return kSuccess;
+    return commit();
 }
 
 /* DataBase Delete, Insert, Read, Update */

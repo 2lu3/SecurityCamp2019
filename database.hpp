@@ -44,6 +44,10 @@ public:
         {
             id = kIdNull;
         }
+        Record(uint64_t new_id)
+        {
+            id = new_id;
+        }
         const static std::uint64_t kIdNull = 0;
         std::uint64_t id;
         std::map<std::string, std::string> columns;
@@ -91,8 +95,14 @@ private:
     // Recordが制約に収まっているかチェックする
     int checkRecord(const Record &check_record);
     int setID2Record(Record &target_record);
+
+    /* commit 関連の補助関数 */
     int saveWriteSet2RedoLog(std::ofstream &file);
     int updatePrimaryIndexFromWriteSet();
+
+    /* crash recovery 関連の補助関数*/
+    // redo.logを格納したsstreamを読み込み、write_setに変換する
+    int createWriteSetWithCheck(std::stringstream &sstream);
 
     std::set<std::string> column_names = {"name", "age"};
 
