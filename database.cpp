@@ -2,8 +2,10 @@
 
 #include <cstdint>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <map>
+#include <iomanip>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -27,6 +29,7 @@ using std::uint32_t;
 using std::uint64_t;
 using std::uint8_t;
 using std::vector;
+using std::hash;
 
 // 現在の関数名を取得
 #define FUNCNAME __FUNCTION__
@@ -105,41 +108,57 @@ bool DataBase::checkRecord(const Record &check_record)
 bool DataBase::saveWriteSet2RedoLog(ofstream &file)
 {
     // write_set = map<id, record>
+    int i = 0;
     for (const auto &[id, record] : write_set)
     {
+        i++;
+
+        string out_message;
         if (record.option == Record::DELETE)
         {
             // delete
             // 完成図 : D(\x1f)D(\x1f)(\x1e)
-            file << "D\x1f" << id << '\x1f' << '\x1e';
+            out_message = "D\x1f" + to_string(id) + "\x1f\x1e";
         }
         else if (record.option == Record::INSERT)
         {
             // insert
             // 完成図 : I(\x1f)id(\x1f)key(\x1f)value(\x1f)...value(\x1f)(\x1e)
-            file << "I\x1f" << id << '\x1f';
+            out_message = "I\x1f" + to_string(id) + string{'\x1f'};
+
             for (const auto &[column_name, column_value] : record.columns)
             {
-                file << column_name << '\x1f' << column_value << '\x1f';
+                out_message += column_name + string{'\x1f'} + column_value + string{'\x1f'};
             }
-            file << '\x1e';
+            out_message += string{'\x1e'};
         }
         else if (record.option == Record::UPDATE)
         {
             // update
             // 完成図 : U(\x1f)id(\x1f)key(\x1f)value(\x1f)...value(\x1f)(\x1e)
-            file << "U\x1f" << id << '\x1f';
+            out_message = "U\x1f" + to_string(id) + string{'\x1f'};
             for (const auto &[column_name, column_value] : record.columns)
             {
-                file << column_name << '\x1f' << column_value << '\x1f';
+                out_message += column_name + string{'\x1f'} + column_value + string{'\x1f'};
             }
-            file << '\x1e';
+            out_message += string{'\x1e'};
         }
         else
         {
             cerr << "Error: " << FUNCNAME << "(): no option error" << endl;
             return kFailure;
         }
+        uint64_t message_size = out_message.size();
+
+        uint64_t hash = getHash(out_message);
+
+        stringstream ss;
+        ss << std::setfill('0') << std::setw(getHashDigit()) << to_string(message_size) << '\x1f' << std::setfill('0') << std::setw(getHashDigit()) << hash;
+        cout << ss.str() << endl;
+
+        out_message = ss.str() + string{'\x1f'} + out_message;
+
+        file << out_message << flush;
     }
     if (file.fail())
     {
@@ -255,6 +274,8 @@ bool DataBase::commit()
     file << "CS\x1e" << flush;
     file.close();
 
+    return kSuccess;
+
     // write_setの内容をprimary_indexに反映する
     updateIndexFromWriteSet();
 
@@ -310,7 +331,7 @@ bool DataBase::substituteNameValue4Record(const std::string &message, uint32_t s
         value = message.substr(start_pos + 1, end_pos - start_pos - 1);
         start_pos = end_pos;
         record.columns[key] = value;
-    } while (end_pos < message_size - 1);
+    } while (end_pos < message_size - 2);
     return kSuccess;
 }
 
@@ -318,6 +339,7 @@ uint32_t DataBase::substituteID4Record(const string &message, Record &record)
 {
     uint32_t start_pos = 2;
     uint32_t end_pos = message.find('\x1f', start_pos + 1);
+    cout << message.substr(start_pos + 1, end_pos - start_pos - 1) << endl;
     uint64_t id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
     record.id = id;
     return end_pos;
@@ -385,11 +407,23 @@ bool DataBase::createWriteSetWithCheck(stringstream &sstream)
     // redo.log書き込み終了 : 0
     // commit処理終了 : 1
     int is_redolog_output_finished = -1;
+    string all_message = sstream.str();
+    uint64_t all_message_size = all_message.size();
     string message;
     // redo.logの命令文単位での区切り文字は、0x1e
-    while (std::getline(sstream, message, '\x1e'))
+    uint64_t now_reading_position = 0;
+    while (now_reading_position < all_message_size - 3)
     {
-        cout << message << endl;
+        uint64_t data_digit = stoull(all_message.substr(now_reading_position, getHashDigit()));
+        uint64_t hash = stoull(all_message.substr(now_reading_position + getHashDigit() + 1, getHashDigit()));
+        uint64_t sentence_digit = data_digit + getHashDigit() * 2 + 1;
+        message = all_message.substr(now_reading_position + getHashDigit() * 2 + 2, data_digit);
+
+
+        if(getHash(message) != hash) {
+            cerr << "Error: " << FUNCNAME << "(): hash error " << getHash(message) << " " << hash << endl;
+            return kFailure;
+        }
         if (message.substr(0, 2) == "CS")
         {
             // 上の完成図参照
@@ -418,6 +452,8 @@ bool DataBase::createWriteSetWithCheck(stringstream &sstream)
             cerr << "undefined command " << message << endl;
             return kFailure;
         }
+
+        now_reading_position += sentence_digit + 1;
     }
 
     if (is_redolog_output_finished == -1)

@@ -34,8 +34,6 @@ using std::vector;
 4. commit終了
 2-2. redo.logを消去
 
-
-
 */
 
 int main()
@@ -72,6 +70,7 @@ int main()
         cout << "id " << id << " name " << record.columns["name"] << endl;
     }
 
+    // dataBase.commit();
     cout << "commit result " << dataBase.commitTest() << endl;
     // dataBase.crashRecovery();
 
