@@ -149,7 +149,7 @@ public:
     /* read record 関連の補助関数 */
     bool searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets);
     bool searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets);
-    bool mergeBeforeAfter(std::set<uint64_t> &base, std::set<uint64_t> &new);
+    bool mergeBeforeAfter(std::set<uint64_t> &base_set, std::set<uint64_t> &new_set);
 
     std::set<std::string> column_names = {"name", "age"};
 

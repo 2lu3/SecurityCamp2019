@@ -11,26 +11,7 @@
 #include <vector>
 #include <set>
 
-using std::cerr;
-using std::cout;
-using std::endl;
-using std::extent;
-using std::flush;
-using std::ifstream;
-using std::int64_t;
-using std::map;
-using std::ofstream;
-using std::set;
-using std::stoull;
-using std::string;
-using std::stringstream;
-using std::to_string;
-using std::uint32_t;
-using std::uint64_t;
-using std::uint8_t;
-using std::vector;
-using std::hash;
-
+using namespace std;
 // 現在の関数名を取得
 #define FUNCNAME __FUNCTION__
 
@@ -606,18 +587,14 @@ bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_
                 column_sets.insert(id);
             }
         }
-        if (i == 0)
-        {
-            // iが0のときは飛ばす
-            continue;
-        }
+
     }
     else
     {
         if (auto column_names_itr = column_names.find(column_name_value_pair.first); column_names_itr != column_names.end())
         {
             //  keyが正しい場合は、パス
-            continue;
+            return kSuccess;
         }
         else
         {
@@ -625,12 +602,13 @@ bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_
             return kFailure;
         }
     }
+    return kSuccess;
 }
 
-bool mergeBeforeAfter(std::set<uint64_t> &base, std::set<uint64_t> &new) {
-    auto itr0 = base.begin();
-    auto itr1 = new.begin();
-    while (itr0 != base.end() && itr1 != new.end())
+bool DataBase::mergeBeforeAfter(std::set<uint64_t> &base_set, std::set<uint64_t> &new_set) {
+    auto itr0 = base_set.begin();
+    auto itr1 = new_set.begin();
+    while (itr0 != base_set.end() && itr1 != new_set.end())
     {
         if (*itr0 == *itr1)
         {
@@ -641,7 +619,7 @@ bool mergeBeforeAfter(std::set<uint64_t> &base, std::set<uint64_t> &new) {
         else if (*itr0 < *itr1)
         {
             // 小さいほうは、==になることはないので、消す
-            itr0 = base.erase(itr0);
+            itr0 = base_set.erase(itr0);
         }
         else
         {
@@ -699,6 +677,9 @@ bool DataBase::readRecord(Columns columns, vector<Record> &return_records)
         }
 
         searchInWriteSet(column_name_value_pair, column_sets[i == 0]);
+        if(i == 0) {
+            continue;
+        }
         searchInDB(column_name_value_pair, column_sets[i == 0]);
         mergeBeforeAfter(column_sets[0], column_sets[1]);
         ++i;
