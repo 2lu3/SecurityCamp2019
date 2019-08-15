@@ -567,6 +567,94 @@ bool DataBase::insertRecord(Record &new_record)
     return kSuccess;
 }
 
+bool DataBase::searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets) {
+    // write set検索
+    // write set(map型)内のRecordをすべて回す
+    // write_set_itr->second = write_set内のRecord
+    for (auto write_set_itr = write_set.begin(); write_set_itr != write_set.end(); ++write_set_itr)
+    {
+        // Recordのcolumnsのcolumn_nameがcolumn_valueかどうか
+        // itrは、columnsのiterator
+        // if(auto itr = record.columns.find(column_name); itr != record.columns.end())
+        auto &selected_record = write_set_itr->second;
+        if (auto itr = selected_record.columns.find(column_name_value_pair.first); itr != selected_record.columns.end())
+        {
+            // Record.column[column_name] == value
+            if (itr->second == column_name_value_pair.second)
+            {
+                // column_sets[iが0なら0、それ以外なら1]に追加
+                column_sets.insert(selected_record.id);
+            }
+        }
+    }
+    return kSuccess;
+}
+
+bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets) {
+    // <column_name, column_value>のペアで、ID(複数・set型)を検索する
+    if (auto column_index_itr = column_index.find(column_name_value_pair); column_index_itr != column_index.end())
+    {
+        // column_index_itr->second(set型)から、順番にIDを抽出
+        for (auto const &id : column_index_itr->second)
+        {
+            // 抽出したidがwrite_setに存在するか
+            // write_setに存在する場合、なにもしない
+            if (auto write_set_itr = write_set.find(id); write_set_itr == write_set.end())
+            {
+                // 存在しない場合のみ追加
+                // i==0のとき0,それ以外の時1にする
+                column_sets.insert(id);
+            }
+        }
+        if (i == 0)
+        {
+            // iが0のときは飛ばす
+            continue;
+        }
+    }
+    else
+    {
+        if (auto column_names_itr = column_names.find(column_name_value_pair.first); column_names_itr != column_names.end())
+        {
+            //  keyが正しい場合は、パス
+            continue;
+        }
+        else
+        {
+            cerr << "Error: " << FUNCNAME << "(): column_name and value error" << endl;
+            return kFailure;
+        }
+    }
+}
+
+bool mergeBeforeAfter(std::set<uint64_t> &base, std::set<uint64_t> &new) {
+    auto itr0 = base.begin();
+    auto itr1 = new.begin();
+    while (itr0 != base.end() && itr1 != new.end())
+    {
+        if (*itr0 == *itr1)
+        {
+            ++itr0;
+            ++itr1;
+            continue;
+        }
+        else if (*itr0 < *itr1)
+        {
+            // 小さいほうは、==になることはないので、消す
+            itr0 = base.erase(itr0);
+        }
+        else
+        {
+            // *itr0 > *itr1
+            // 小さいほうは、==になることはないので飛ばす
+            // 保存するのは、itr0のほうだけ(消すのはもったないない)
+            ++itr1;
+        }
+    }
+    return kSuccess;
+}
+
+
 /*
     columnsで指定した条件にあうRecord(複数可)を返す関数
     用例:
@@ -609,86 +697,14 @@ bool DataBase::readRecord(Columns columns, vector<Record> &return_records)
             cerr << "Error " << FUNCNAME << "(): column name error" << endl;
             return kFailure;
         }
-        // write set検索
-        // write set(map型)内のRecordをすべて回す
-        // write_set_itr->second = write_set内のRecord
-        for (auto write_set_itr = write_set.begin(); write_set_itr != write_set.end(); ++write_set_itr)
-        {
-            // Recordのcolumnsのcolumn_nameがcolumn_valueかどうか
-            // itrは、columnsのiterator
-            // if(auto itr = record.columns.find(column_name); itr != record.columns.end())
-            auto &selected_record = write_set_itr->second;
-            if (auto itr = selected_record.columns.find(column_name_value_pair.first); itr != selected_record.columns.end())
-            {
-                // Record.column[column_name] == value
-                if (itr->second == column_name_value_pair.second)
-                {
-                    // column_sets[iが0なら0、それ以外なら1]に追加
-                    column_sets[i != 0].insert(selected_record.id);
-                }
-            }
-        }
 
-        // <column_name, column_value>のペアで、ID(複数・set型)を検索する
-        if (auto column_index_itr = column_index.find(column_name_value_pair); column_index_itr != column_index.end())
-        {
-            // column_index_itr->second(set型)から、順番にIDを抽出
-            for (auto const &id : column_index_itr->second)
-            {
-                // 抽出したidがwrite_setに存在するか
-                // write_setに存在する場合、なにもしない
-                if (auto write_set_itr = write_set.find(id); write_set_itr == write_set.end())
-                {
-                    // 存在しない場合のみ追加
-                    // i==0のとき0,それ以外の時1にする
-                    column_sets[i != 0].insert(id);
-                }
-            }
-            if (i == 0)
-            {
-                // iが0のときは飛ばす
-                continue;
-            }
-        }
-        else
-        {
-            if (auto column_names_itr = column_names.find(column_name_value_pair.first); column_names_itr != column_names.end())
-            {
-                //  keyが正しい場合は、パス
-                continue;
-            }
-            else
-            {
-                cerr << "Error: " << FUNCNAME << "(): column_name and value error" << endl;
-                return kFailure;
-            }
-        }
-        auto itr0 = column_sets[0].begin();
-        auto itr1 = column_sets[1].begin();
-        while (itr0 != column_sets[0].end() && itr1 != column_sets[1].end())
-        {
-            if (*itr0 == *itr1)
-            {
-                ++itr0;
-                ++itr1;
-                continue;
-            }
-            else if (*itr0 < *itr1)
-            {
-                // 小さいほうは、==になることはないので、消す
-                itr0 = column_sets[0].erase(itr0);
-            }
-            else
-            {
-                // *itr0 > *itr1
-                // 小さいほうは、==になることはないので飛ばす
-                // 保存するのは、itr0のほうだけ(消すのはもったないない)
-                ++itr1;
-            }
-        }
+        searchInWriteSet(column_name_value_pair, column_sets[i == 0]);
+        searchInDB(column_name_value_pair, column_sets[i == 0]);
+        mergeBeforeAfter(column_sets[0], column_sets[1]);
         ++i;
     }
 
+    // 結果をreturn_recordに代入する
     for (auto const &id : column_sets[0])
     {
         if (auto write_set_itr = write_set.find(id); write_set_itr != write_set.end())
