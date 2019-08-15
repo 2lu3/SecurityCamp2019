@@ -12,6 +12,8 @@
 #include <set>
 
 using namespace std;
+
+
 // 現在の関数名を取得
 #define FUNCNAME __FUNCTION__
 
@@ -41,14 +43,11 @@ bool DataBase::createKey(std::string columns[])
 bool DataBase::checkRecord(const Record &check_record)
 {
     // 制約1: idはユニークである
-    if (check_record.option == Record::INSERT)
-    {
-        if (auto itr = primary_index.find(check_record.id); itr != primary_index.end())
-        {
-            // primary_indexに登録されている
-            cerr << "Error: " << FUNCNAME << "(): already registered" << endl;
-            return kFailure;
-        }
+    if (check_record.option == Record::INSERT &&
+        primary_index.find(check_record.id) != primary_index.end()) {
+        // primary_indexに登録されている
+        cerr << "Error: " << FUNCNAME << "(): already registered" << endl;
+        return kFailure;
     }
 
     // 制約2: idはkIdNull以外である
@@ -93,6 +92,9 @@ bool DataBase::saveWriteSet2RedoLog(ofstream &file)
     for (const auto &[id, record] : write_set)
     {
         i++;
+
+        // const char SEP1[] = "\x1f";
+        // const char SEP2[] = "\x1e";
 
         string out_message;
         if (record.option == Record::DELETE)
@@ -151,8 +153,41 @@ bool DataBase::saveWriteSet2RedoLog(ofstream &file)
     }
 }
 
+// これ、bool が返ることになっていて、false 返らないけど問題ない？
 bool DataBase::updateIndexOfDelete(uint64_t id)
 {
+    // あまり if 内での初期化を多用しない方が良いかも知れませんね。
+    // この関数内で一番大事な処理が primary_index_itr を得ることですからね。。
+    // 読みやすくするために重要なのは 1 行に情報をつめこみすぎないことです。
+
+    // 無理して使わなくても良いテクニックですが、
+    // 何か条件を満たすときのみ処理をするというコードは、
+    // 条件を満たさないときに return で抜けてしまうという処理を先にやるとコードが
+    // スッキリします。
+
+    // 変数の名前について：
+    // いろいろと考え方があると思うので、どれが良いとは一概に言えませんが、
+    // (1) スコープが短かいものは短い名前にする。必要なら変数のコメントで説明する。
+    // (2) 短い名前とは 識別子か 1 単語かその省略形
+    //     識別子: i, j (整数のことが多い)、v (vector とか？)、 p (ポインタ)、s (サイズ)、e (エラー) など。
+    //       もちろん変数が短いことでコードが読みやすいということが大前提です。
+    //     1単語: pair
+    //     1単語の省略形: iter, itr, it
+    // を心がけるとスッキリしつつ意味が分かりやすいかと思います。
+    // 今回は、itr や pair などは初期化の文を見ればほぼ一目瞭然なのでコメント不要という感じ。
+    // aaa_bbb_ccc という名前は読むときでも毎回 aaa の bbb の ccc、、、 と解釈に時間がかかるのです。
+    // 一方、グローバル変数や関数はスコープが長いものが多いので、省略することには慎重になる必要があります。
+
+#if 0 // 例
+    auto itr = primary_index.find(id);
+    if (itr == primary_index.end()) return kFailure;
+    for (const auto& pair : itr->second.columns) {
+        column_index[pair].erase(id);
+    }
+    primary_inde.erase(id);
+    return kSuccess;
+#endif
+
     if (auto primary_index_itr = primary_index.find(id); primary_index_itr != primary_index.end())
     {
         // primary_indexに登録されていた場合
@@ -178,18 +213,24 @@ bool DataBase::updateIndexOfUpdate(const Record &record)
 
     for (; after_column_itr != record.columns.end(); ++before_column_itr, ++after_column_itr)
     {
-        // 前後で値が変わる場合
+        // 前後で値が変わる場合 <---
         if (before_column_itr->second != after_column_itr->second)
         {
-            // beforeを削除
+            // beforeを削除  <---
             column_index[*before_column_itr].erase(record.id);
-            // afterを追加
+            // afterを追加 <---
             column_index[*after_column_itr].insert(record.id);
         }
     }
 
-    // primary_indexの更新
+    // primary_indexの更新 <---
     primary_index[record.id] = record;
+
+    // コメントに何を書くかについて。
+    // コードを見れば分かることは書く必要がないどころか読む人にとって二度手間になります。
+    // もちろん、少し長めのコードについて要約するとこういうことだと書いてあるコメントには意味がありますが、
+    // そのようなケースでは関数として分離できないか検討すると良いでしょう。
+
     return kSuccess;
 }
 
@@ -215,12 +256,14 @@ bool DataBase::updateIndexOfInsert(const Record &record)
     return kSuccess;
 }
 
+// やっていることがものすごく分かりやすくなりました。
 bool DataBase::updateIndexFromWriteSet()
 {
     for (const auto &[id, selected_record] : write_set)
     {
         if (selected_record.option == Record::DELETE)
         {
+            // id == selected_record.id ということで OK？
             updateIndexOfDelete(selected_record.id);
         }
         else if (selected_record.option == Record::UPDATE)
@@ -252,10 +295,10 @@ bool DataBase::commit()
 
     saveWriteSet2RedoLog(file);
     // commit start
-    file << "CS\x1e" << flush;
+    file << "CS\x1e" << flush;  // これは関数化した方が良いですね。たった 1 行ですが詳細が見えてしまっているので。
     file.close();
 
-    return kSuccess;
+    return kSuccess; // ？？？
 
     // write_setの内容をprimary_indexに反映する
     updateIndexFromWriteSet();
@@ -294,21 +337,22 @@ bool DataBase::abort()
     return kSuccess;
 }
 
+// substitute よりも deserialize かなぁ。
 bool DataBase::substituteNameValue4Record(const std::string &message, uint32_t start_pos, Record &record)
 {
     uint32_t end_pos;
-    // keyとvalueの読み込み
+    // keyとvalueの読み込み <--- ？？？
     string key, value;
     uint32_t message_size = message.size();
     do
     {
         // key
-        end_pos = message.find('\x1f', start_pos + 1);
+        end_pos = message.find('\x1f', start_pos + 1); // x1f がなかったときのエラー処理が必要。
         key = message.substr(start_pos + 1, end_pos - start_pos - 1);
         start_pos = end_pos;
 
         // value
-        end_pos = message.find('\x1f', start_pos + 1);
+        end_pos = message.find('\x1f', start_pos + 1); // 同様にエラー処理が必要。
         value = message.substr(start_pos + 1, end_pos - start_pos - 1);
         start_pos = end_pos;
         record.columns[key] = value;
@@ -319,8 +363,10 @@ bool DataBase::substituteNameValue4Record(const std::string &message, uint32_t s
 uint32_t DataBase::substituteID4Record(const string &message, Record &record)
 {
     uint32_t start_pos = 2;
-    uint32_t end_pos = message.find('\x1f', start_pos + 1);
+    uint32_t end_pos = message.find('\x1f', start_pos + 1); // エラー処理
     cout << message.substr(start_pos + 1, end_pos - start_pos - 1) << endl;
+
+    // 入力のチェックとエラー処理。
     uint64_t id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
     record.id = id;
     return end_pos;
@@ -479,6 +525,7 @@ bool DataBase::crashRecovery()
         return kFailure;
     }
 
+    // debug code
     cout << "write set " << endl;
     for (auto &[id, record] : write_set)
     {
@@ -521,6 +568,8 @@ bool DataBase::setID2Record(Record &target_record)
     auto primary_itr = primary_index.find(id);
     auto write_set_itr = write_set.find(id);
 
+    // プロトタイプならこのコードでも良いですが、適切なアルゴリズムとは言えなさそう。
+    // あと、これは関数として分離すべきです。generateId() など。
     while (primary_itr != primary_index.end() || write_set_itr != write_set.end() || id == Record::kIdNull)
     {
         id = randID();
@@ -711,6 +760,25 @@ bool DataBase::readRecord(Columns columns, vector<Record> &return_records)
 // Idで指定したRecordをreturn_recordに代入する
 bool DataBase::readRecord(uint64_t id, Record &return_record)
 {
+
+    // これは部品化すべき。
+#if 0
+    // Record* searchRecordInWriteSet(uint64_t id);
+    Record* rec = searchRecordInWriteSet(id);
+    if (rec != nullptr) {
+        if (rec->option == Record::DELETE) return kFailure;
+        return_record = *rec;
+        return kSuccess;
+    }
+    auto itr = primary_index.find(id);
+    if (itr == primary_index.end()) {
+        // cerr
+        return kFailure;
+    }
+    rec = &itr->second;
+    return_record = *rec;
+    return kSuccess;
+#endif
 
     if (auto write_set_itr = write_set.find(id); write_set_itr != write_set.end())
     {

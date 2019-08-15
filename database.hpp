@@ -32,8 +32,12 @@
 class DataBase
 {
 public:
+    // column name, column value
     using Columns = std::map<std::string, std::string>;
     DataBase();
+
+    // id の型も Id と別名つけた方が分かりやすそうですね。
+    // using Id = uint64_t;
 
     /*  制約
         1: idはユニークである
@@ -99,6 +103,18 @@ public:
 
     std::map<std::uint64_t, Record> primary_index;
 
+    // using ColumnName = std::string
+    // using ColumnValue = std::string
+    // using Column = std::pair<ColumnName, ColumnValue>;
+    // ちょっとやりすぎかも知れませんが、意味が通りやすくなります。
+    // 少なくともColumn の定義は必要でしょうね。
+    //
+    // あと、column 毎の secondary index を作るなら、
+    // using ColumnIndex = std::map<ColumnValue, std::set<Id>>;
+    // using ColumnIndexes = std::map<ColumnName, ColumnIndex>;
+    // の方が自然ではあります。今の構造のままやるとすると、
+    // using ColumnIndexes = std::map<Column, std::set<Id>>;
+    // ですね。
     std::map<std::pair<std::string, std::string>, std::set<std::uint64_t>> column_index;
 
     bool commitTest();
@@ -109,12 +125,10 @@ public:
         RandID() : mt(std::random_device()()), dist(1, UINT64_MAX)
         {
         }
-
-        inline std::uint64_t operator()()
+        std::uint64_t operator()()
         {
             return dist(mt);
         }
-
     private:
         std::mt19937 mt;
         std::uniform_int_distribution<uint64_t> dist;
@@ -153,6 +167,7 @@ public:
 
     std::set<std::string> column_names = {"name", "age"};
 
+    // ↓このあたりのコメントも新しくしましょう。
     // id-tableの添字を格納する
     // update : write_setに書き換えたものを代入
     // insert : primary_indexにないidを追加
