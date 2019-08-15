@@ -63,11 +63,17 @@ int main()
         record.columns["name"] = name;
         record.columns["age"] = age;
         dataBase.insertRecord(record);
+
         ++i;
     }
 
-    dataBase.commit();
-    dataBase.crashRecovery();
+    for (auto &[id, record] : dataBase.write_set)
+    {
+        cout << "id " << id << " name " << record.columns["name"] << endl;
+    }
+
+    cout << "commit result " << dataBase.commitTest() << endl;
+    // dataBase.crashRecovery();
 
     cout << "start " << endl;
     for (auto &[name_value_pair, id_set] : dataBase.column_index)
@@ -77,12 +83,13 @@ int main()
             cout << "name " << name_value_pair.first << " value " << name_value_pair.second << " id " << id << endl;
         }
     }
-    cout << "end" << endl;
-
     for (auto itr = dataBase.primary_index.begin(); itr != dataBase.primary_index.end(); ++itr)
     {
         cout << "id " << itr->second.id << " " << itr->second.columns["name"] << " " << itr->second.columns["age"] << endl;
     }
+    cout << "end" << endl;
+    return 0;
+
     return 0;
 
     vector<DataBase::Record> vec;
