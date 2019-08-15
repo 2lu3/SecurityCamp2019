@@ -77,9 +77,9 @@ public:
     bool createKey(std::string columns[]); // 未実装
 
     // idで指定したRecordをupdate_record_conditionに置き換える
-    bool updateRecord(std::uint64_t id, const Record &update_record_condition);
+    bool updateRecord(std::uint64_t id, Record &update_record_condition);
     // target_recordで指定したRecordをupdate_record_conditionに置き換える
-    bool updateRecord(const Record &target_record, const Record &update_record_condition);
+    bool updateRecord(const Record &target_record, Record &update_record_condition);
 
     // target_recordで指定したRecordを消去する
     bool deleteRecord(const Record &target_record);

@@ -259,11 +259,11 @@ bool DataBase::commit()
     updateIndexFromWriteSet();
 
     // Commit Finish
-    // これがない場合、redologの内容はcrash_recorveryで実行しない
     file << "CF\x1e" << flush;
 
     return kSuccess;
 }
+
 bool DataBase::commitTest()
 {
     std::ofstream file("redo.log", std::ios::out);
@@ -285,8 +285,10 @@ bool DataBase::commitTest()
 
 bool DataBase::abort()
 {
-    // ファイルの内容を破棄するだけ
+    // ファイルの内容を破棄する
     ofstream file("redo.log", std::ios::out);
+    // write_setの初期化
+    write_set.clear();
     return kSuccess;
 }
 
@@ -517,6 +519,7 @@ bool DataBase::setID2Record(Record &target_record)
 // table[]の末尾に新しいRecordを追加
 bool DataBase::insertRecord(Record &new_record)
 {
+    new_record.option = Record::INSERT;
     setID2Record(new_record);
     if (checkRecord(new_record) == kFailure)
     {
@@ -709,8 +712,9 @@ bool DataBase::readRecord(uint64_t id, Record &return_record)
     update_record_condition : 変更後のRecord
     target_recordを使用して、tableでの添字を取得し、update_record_conditionを代入する
 */
-bool DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
+bool DataBase::updateRecord(uint64_t id, Record &update_record_condition)
 {
+    update_record_condition.option = Record::UPDATE;
     // update_record_conditionが制約に反していないかチェックする
     if (checkRecord(update_record_condition) == kFailure)
     {
@@ -750,7 +754,7 @@ bool DataBase::updateRecord(uint64_t id, const Record &update_record_condition)
 }
 
 // updateRecord(uint64_t id, const Record &update_record_condition)のオーバーロード
-bool DataBase::updateRecord(const Record &target_record, const Record &update_record_condition)
+bool DataBase::updateRecord(const Record &target_record, Record &update_record_condition)
 {
     return updateRecord(target_record.id, update_record_condition);
 }
