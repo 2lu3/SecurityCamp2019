@@ -41,14 +41,12 @@ bool DataBase::createKey(std::string columns[])
 bool DataBase::checkRecord(const Record &check_record)
 {
     // 制約1: idはユニークである
-    if (check_record.option == Record::INSERT)
+    if (check_record.option == Record::INSERT &&
+        primary_index.find(check_record.id) != primary_index.end())
     {
-        if (auto itr = primary_index.find(check_record.id); itr != primary_index.end())
-        {
-            // primary_indexに登録されている
-            cerr << "Error: " << FUNCNAME << "(): already registered" << endl;
-            return kFailure;
-        }
+        // primary_indexに登録されている
+        cerr << "Error: " << FUNCNAME << "(): already registered" << endl;
+        return kFailure;
     }
 
     // 制約2: idはkIdNull以外である
@@ -90,56 +88,62 @@ bool DataBase::saveWriteSet2RedoLog(ofstream &file)
 {
     // write_set = map<id, record>
     int i = 0;
+
+    const char SEP1 = '\x1f';
+    const char SEP2 = '\x1e';
+
     for (const auto &[id, record] : write_set)
     {
         i++;
-
-        string out_message;
+        stringstream out_message;
         if (record.option == Record::DELETE)
         {
             // delete
             // 完成図 : D(\x1f)D(\x1f)(\x1e)
-            out_message = "D\x1f" + to_string(id) + "\x1f\x1e";
+            out_message << 'D' << SEP1 << id << SEP1 << SEP2;
         }
         else if (record.option == Record::INSERT)
         {
             // insert
             // 完成図 : I(\x1f)id(\x1f)key(\x1f)value(\x1f)...value(\x1f)(\x1e)
-            out_message = "I\x1f" + to_string(id) + string{'\x1f'};
+            // todo: 読み込むときにfor文の回数を確定させる
+            out_message << "I\x1f" << id << SEP1;
 
             for (const auto &[column_name, column_value] : record.columns)
             {
-                out_message += column_name + string{'\x1f'} + column_value + string{'\x1f'};
+                out_message << column_name << SEP1 << column_value << SEP1;
             }
-            out_message += string{'\x1e'};
+            out_message << SEP2;
         }
         else if (record.option == Record::UPDATE)
         {
             // update
             // 完成図 : U(\x1f)id(\x1f)key(\x1f)value(\x1f)...value(\x1f)(\x1e)
-            out_message = "U\x1f" + to_string(id) + string{'\x1f'};
+            out_message << 'U' << SEP1 << id << SEP1;
             for (const auto &[column_name, column_value] : record.columns)
             {
-                out_message += column_name + string{'\x1f'} + column_value + string{'\x1f'};
+                out_message << column_name << SEP1 << column_value << SEP1;
             }
-            out_message += string{'\x1e'};
+            out_message << SEP2;
         }
         else
         {
             cerr << "Error: " << FUNCNAME << "(): no option error" << endl;
             return kFailure;
         }
-        uint64_t message_size = out_message.size();
+        string out_message_string = out_message.str();
+        uint64_t message_size = out_message_string.size();
 
-        uint64_t hash = getHash(out_message);
+        uint64_t hash = getHash(out_message_string);
 
+        // todo: 直接ファイルに出力
         stringstream ss;
         ss << std::setfill('0') << std::setw(getHashDigit()) << to_string(message_size) << '\x1f' << std::setfill('0') << std::setw(getHashDigit()) << hash;
         cout << ss.str() << endl;
 
-        out_message = ss.str() + string{'\x1f'} + out_message;
+        file << ss.str() << SEP1 << out_message_string << flush;
 
-        file << out_message << flush;
+        file.close();
     }
     if (file.fail())
     {
@@ -400,8 +404,8 @@ bool DataBase::createWriteSetWithCheck(stringstream &sstream)
         uint64_t sentence_digit = data_digit + getHashDigit() * 2 + 1;
         message = all_message.substr(now_reading_position + getHashDigit() * 2 + 2, data_digit);
 
-
-        if(getHash(message) != hash) {
+        if (getHash(message) != hash)
+        {
             cerr << "Error: " << FUNCNAME << "(): hash error " << getHash(message) << " " << hash << endl;
             return kFailure;
         }
@@ -548,7 +552,8 @@ bool DataBase::insertRecord(Record &new_record)
     return kSuccess;
 }
 
-bool DataBase::searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets) {
+bool DataBase::searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets)
+{
     // write set検索
     // write set(map型)内のRecordをすべて回す
     // write_set_itr->second = write_set内のRecord
@@ -571,7 +576,8 @@ bool DataBase::searchInWriteSet(const std::pair<std::string, std::string> column
     return kSuccess;
 }
 
-bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets) {
+bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets)
+{
     // <column_name, column_value>のペアで、ID(複数・set型)を検索する
     if (auto column_index_itr = column_index.find(column_name_value_pair); column_index_itr != column_index.end())
     {
@@ -587,7 +593,6 @@ bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_
                 column_sets.insert(id);
             }
         }
-
     }
     else
     {
@@ -605,7 +610,8 @@ bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_
     return kSuccess;
 }
 
-bool DataBase::mergeBeforeAfter(std::set<uint64_t> &base_set, std::set<uint64_t> &new_set) {
+bool DataBase::mergeBeforeAfter(std::set<uint64_t> &base_set, std::set<uint64_t> &new_set)
+{
     auto itr0 = base_set.begin();
     auto itr1 = new_set.begin();
     while (itr0 != base_set.end() && itr1 != new_set.end())
@@ -631,7 +637,6 @@ bool DataBase::mergeBeforeAfter(std::set<uint64_t> &base_set, std::set<uint64_t>
     }
     return kSuccess;
 }
-
 
 /*
     columnsで指定した条件にあうRecord(複数可)を返す関数
@@ -677,7 +682,8 @@ bool DataBase::readRecord(Columns columns, vector<Record> &return_records)
         }
 
         searchInWriteSet(column_name_value_pair, column_sets[i == 0]);
-        if(i == 0) {
+        if (i == 0)
+        {
             continue;
         }
         searchInDB(column_name_value_pair, column_sets[i == 0]);

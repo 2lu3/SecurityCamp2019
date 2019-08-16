@@ -9,6 +9,8 @@
 #include <utility>
 #include <functional>
 
+#include "FileIo.hpp"
+
 /*  データベース設計
 1. Read, Insert, Update, Deleteを複数回実行
     * ここでの操作は、Commitするまでデータベースには反映されない
@@ -160,12 +162,14 @@ public:
     std::map<std::uint64_t, Record> write_set;
     // map<pair<column名, value>, set<id>> : keyを指定したうえで、valueからidを効率的に探す
 private:
-    uint32_t getHashDigit() {
+    uint32_t getHashDigit()
+    {
         const static uint32_t digit = std::to_string(UINT64_MAX).size();
         return digit;
     }
 
-    uint64_t getHash(std::string &str)  {
+    uint64_t getHash(std::string &str)
+    {
         static std::hash<std::string> hash_fn;
         return hash_fn(str);
     }
