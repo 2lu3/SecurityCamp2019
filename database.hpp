@@ -107,7 +107,7 @@ public:
 
     std::map<Id, Record> primary_index;
 
-    std::map<ColumnIndexes> column_index;
+    ColumnIndexes column_index;
 
     bool commitTest();
 
@@ -118,7 +118,7 @@ public:
         {
         }
 
-        inline std::Id operator()()
+        inline Id operator()()
         {
             return dist(mt);
         }
@@ -132,13 +132,13 @@ public:
     // Recordが制約に収まっているかチェックする
     bool
     checkRecord(const Record &check_record);
-    std::Id generateId();
+    Id generateId();
     bool setID2Record(Record &target_record);
 
     /* commit 関連の補助関数 */
     bool saveWriteSet2RedoLog(std::ofstream &file);
     bool updateIndexFromWriteSet();
-    bool updateIndexOfDelete(std::Id id);           // updateIndexFromSet専用
+    bool updateIndexOfDelete(Id id);                // updateIndexFromSet専用
     bool updateIndexOfUpdate(const Record &record); // updateIndexFromSet専用
     bool updateIndexOfInsert(const Record &record); // updateIndexFromSet専用
     bool writeCommitStart2RedoLog(std::ofstream &file);
@@ -158,14 +158,14 @@ public:
     bool writeDelete2WriteSetFromRedoLog(const std::string &message);
 
     /* read record 関連の補助関数 */
-    bool searchInWriteSet(const Column column_name_value_pair, std::set<std::Id> &column_sets);
-    bool searchInDB(const Column column_name_value_pair, std::set<std::Id> &column_sets);
+    bool searchInWriteSet(const Column column_name_value_pair, std::set<Id> &column_sets);
+    bool searchInDB(const Column column_name_value_pair, std::set<Id> &column_sets);
     bool mergeBeforeAfter(std::set<Id> &base_set, std::set<Id> &new_set);
     Record *searchRecordInWriteSetById(Id id);
 
     std::set<std::string> column_names = {"name", "age"};
 
-    std::map<std::Id, Record> write_set;
+    std::map<Id, Record> write_set;
 
 private:
     uint32_t getHashDigit()
@@ -179,4 +179,7 @@ private:
         static std::hash<std::string> hash_fn;
         return hash_fn(str);
     }
+
+    FileIo fileIo;
+    const std::string file_name = "redo.log";
 };

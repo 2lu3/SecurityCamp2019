@@ -5,6 +5,7 @@
 #include <fstream>
 
 #include "database.hpp"
+#include "FileIo.hpp"
 
 using std::cerr;
 using std::cout;
@@ -40,7 +41,8 @@ int main()
 {
     system("chcp 65001");
     DataBase dataBase;
-    DataBase::Record record;
+
+    DataBase::Record record[50];
 
     // データの入力
     std::ifstream file("data.csv");
@@ -51,18 +53,26 @@ int main()
     }
     string buffer;
     int i = 0;
-    while (std::getline(file, buffer) && i < 5)
+    while (std::getline(file, buffer))
     {
         int first_split = buffer.find(',');
         int second_split = buffer.find(',', first_split + 1);
 
         string name = buffer.substr(first_split + 1, second_split - first_split - 1);
         string age = buffer.substr(second_split + 1);
-        record.columns["name"] = name;
-        record.columns["age"] = age;
-        dataBase.insertRecord(record);
-
+        record[i].columns["name"] = name;
+        record[i].columns["age"] = age;
+        dataBase.insertRecord(record[i]);
         ++i;
+    }
+
+    int option = 0;
+    std::cin >> option;
+    dataBase.commit();
+    if (option == 1)
+    {
+        dataBase.crashRecovery();
+        cout << "crash recovery finished" << endl;
     }
 
     for (auto &[id, record] : dataBase.write_set)
@@ -70,9 +80,27 @@ int main()
         cout << "id " << id << " name " << record.columns["name"] << endl;
     }
 
-    // dataBase.commit();
-    cout << "commit result " << dataBase.commitTest() << endl;
+    // cout << "commit result " << dataBase.commitTest() << endl;
     // dataBase.crashRecovery();
+
+    if (option == 1)
+    {
+        return 0;
+    }
+
+    DataBase::Record new_record[50];
+    for (int j = 0; j < 1000000; ++j)
+    {
+        cout << j << endl;
+        for (int i = 0; i < 50; ++i)
+        {
+            new_record[i] = record[i];
+            new_record[i].columns["age"] = j;
+            dataBase.updateRecord(record[i], new_record[i]);
+        }
+    }
+
+    return 0;
 
     cout << "start " << endl;
     for (auto &[name_value_pair, id_set] : dataBase.column_index)

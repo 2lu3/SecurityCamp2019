@@ -1,11 +1,14 @@
-#include <iostream>
-#include "B.hpp"
-#include "A.hpp"
 
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <unistd.h>
+#include <windows.h>
 int main()
 {
-    B b;
-    B::Hoge hoge;
-    hoge.huga = 1;
-    std::cout << b.a->getHoge(hoge) << std::endl;
+    int fd = open("test.txt", O_WRONLY);
+    fsync(fd);
+    close(fd);
 }

@@ -1,4 +1,3 @@
-#include "database.hpp"
 
 #include <cstdint>
 #include <fstream>
@@ -11,21 +10,25 @@
 #include <vector>
 #include <set>
 
+#include "database.hpp"
+#include "FileIo.hpp"
+
 using namespace std;
 // 現在の関数名を取得
 #define FUNCNAME __FUNCTION__
 
 /* DataBase関連 */
 
-DataBase::DataBase()
+DataBase::DataBase() : fileIo(file_name)
 {
+    // fileIo.fsync();
 }
 
 // 未実装
 bool DataBase::begin()
 {
     // redologの初期化
-    ofstream file = ofstream("redo.log", std::ios::out);
+    ofstream file = ofstream(file_name, std::ios::out);
     return kSuccess;
 }
 
@@ -533,7 +536,7 @@ bool DataBase::deleteRecord(Id id)
     return kSuccess;
 }
 
-Id DataBase::generateId()
+DataBase::Id DataBase::generateId()
 {
     Id id = randID();
 
