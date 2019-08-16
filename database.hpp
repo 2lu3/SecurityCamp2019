@@ -58,8 +58,8 @@ public:
         {
             id = new_id;
         }
-        const static std::uint64_t kIdNull = 0;
-        std::uint64_t id;
+        const static Id kIdNull = 0;
+        Id id;
         Columns columns;
 
         enum OperateOption
@@ -71,7 +71,7 @@ public:
         };
         OperateOption option;
     };
-    using PriamryIndex = std::map<std::uint64_t, Record>;
+    using PriamryIndex = std::map<Id, Record>;
 
     // 関数の戻り値で、成功を表す
     const static bool kSuccess = true;
@@ -85,19 +85,19 @@ public:
     bool createKey(std::string columns[]); // 未実装
 
     // idで指定したRecordをupdate_record_conditionに置き換える
-    bool updateRecord(std::uint64_t id, Record &update_record_condition);
+    bool updateRecord(Id id, Record &update_record_condition);
     // target_recordで指定したRecordをupdate_record_conditionに置き換える
     bool updateRecord(const Record &target_record, Record &update_record_condition);
 
     // target_recordで指定したRecordを消去する
     bool deleteRecord(const Record &target_record);
     // idで指定したRecordを消去する
-    bool deleteRecord(std::uint64_t id);
+    bool deleteRecord(Id id);
 
     // target_columnsで指定した条件に合うRecordを返す
     bool readRecord(Columns columns, std::vector<Record> &return_records);
     // idで指定したRecordを返す
-    bool readRecord(std::uint64_t id, Record &return_record);
+    bool readRecord(Id id, Record &return_record);
 
     // new_recordのコピーをtableに追加する
     bool insertRecord(Record &new_record);
@@ -105,9 +105,9 @@ public:
     // 現在の、tableに格納されているRecordの数
     std::uint32_t table_num = 0;
 
-    std::map<std::uint64_t, Record> primary_index;
+    std::map<Id, Record> primary_index;
 
-    std::map<std::pair<std::string, std::string>, std::set<std::uint64_t>> column_index;
+    std::map<ColumnIndexes> column_index;
 
     bool commitTest();
 
@@ -118,27 +118,27 @@ public:
         {
         }
 
-        inline std::uint64_t operator()()
+        inline std::Id operator()()
         {
             return dist(mt);
         }
 
     private:
         std::mt19937 mt;
-        std::uniform_int_distribution<uint64_t> dist;
+        std::uniform_int_distribution<Id> dist;
     };
     RandID randID;
 
     // Recordが制約に収まっているかチェックする
     bool
     checkRecord(const Record &check_record);
-    std::uint64_t generateId();
+    std::Id generateId();
     bool setID2Record(Record &target_record);
 
     /* commit 関連の補助関数 */
     bool saveWriteSet2RedoLog(std::ofstream &file);
     bool updateIndexFromWriteSet();
-    bool updateIndexOfDelete(std::uint64_t id);     // updateIndexFromSet専用
+    bool updateIndexOfDelete(std::Id id);           // updateIndexFromSet専用
     bool updateIndexOfUpdate(const Record &record); // updateIndexFromSet専用
     bool updateIndexOfInsert(const Record &record); // updateIndexFromSet専用
     bool writeCommitStart2RedoLog(std::ofstream &file);
@@ -158,14 +158,14 @@ public:
     bool writeDelete2WriteSetFromRedoLog(const std::string &message);
 
     /* read record 関連の補助関数 */
-    bool searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets);
-    bool searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets);
-    bool mergeBeforeAfter(std::set<uint64_t> &base_set, std::set<uint64_t> &new_set);
-    Record *searchRecordInWriteSetById(uint64_t id);
+    bool searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::Id> &column_sets);
+    bool searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::Id> &column_sets);
+    bool mergeBeforeAfter(std::set<Id> &base_set, std::set<Id> &new_set);
+    Record *searchRecordInWriteSetById(Id id);
 
     std::set<std::string> column_names = {"name", "age"};
 
-    std::map<std::uint64_t, Record> write_set;
+    std::map<std::Id, Record> write_set;
 
 private:
     uint32_t getHashDigit()

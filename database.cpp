@@ -155,7 +155,7 @@ bool DataBase::saveWriteSet2RedoLog(ofstream &file)
     }
 }
 
-bool DataBase::updateIndexOfDelete(uint64_t id)
+bool DataBase::updateIndexOfDelete(Id id)
 {
     auto itr = primary_index.find(id);
     if (itr == primary_index.end())
@@ -202,7 +202,7 @@ bool DataBase::updateIndexOfInsert(const Record &record)
         else
         {
             // column_indexに登録されていない場合、idを新しいsetとして追加する
-            column_index.insert(std::make_pair(column_name_value_pair, set<uint64_t>{record.id}));
+            column_index.insert(std::make_pair(column_name_value_pair, set<Id>{record.id}));
         }
     }
     return kSuccess;
@@ -305,28 +305,16 @@ bool DataBase::deserializeNameValue4Record(const std::string &message, uint32_t 
     do
     {
         // key
-        try
-        {
-            end_pos = message.find('\x1f', start_pos + 1);
-        }
-        catch (const std::exception &e)
-        {
-            std::cerr << e.what() << '\n';
+        end_pos = message.find('\x1f', start_pos + 1);
+        if (end_pos == string::npos)
             return kFailure;
-        }
         key = message.substr(start_pos + 1, end_pos - start_pos - 1);
         start_pos = end_pos;
 
         // value
-        try
-        {
-            end_pos = message.find('\x1f', start_pos + 1);
-        }
-        catch (const std::exception &e)
-        {
-            std::cerr << e.what() << '\n';
+        end_pos = message.find('\x1f', start_pos + 1);
+        if (end_pos == string::npos)
             return kFailure;
-        }
         value = message.substr(start_pos + 1, end_pos - start_pos - 1);
         start_pos = end_pos;
         record.columns[key] = value;
@@ -338,26 +326,14 @@ uint32_t DataBase::deserializeID4Record(const string &message, Record &record)
 {
     uint32_t start_pos = 2;
     uint32_t end_pos;
-    try
-    {
-        end_pos = message.find('\x1f', start_pos + 1);
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what() << '\n';
+    end_pos = message.find('\x1f', start_pos + 1);
+    if (end_pos == string::npos)
         return kFailure;
-    }
     cout << message.substr(start_pos + 1, end_pos - start_pos - 1) << endl;
-    uint64_t id;
-    try
-    {
-        id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << e.what() << '\n';
+    Id id;
+    id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
+    if (end_pos == string::npos)
         return kFailure;
-    }
 
     record.id = id;
     return end_pos;
@@ -433,25 +409,13 @@ bool DataBase::createWriteSetWithCheck(stringstream &sstream)
     while (now_reading_position < all_message_size - 3)
     {
         uint64_t data_digit;
-        try
-        {
-            data_digit = stoull(all_message.substr(now_reading_position, getHashDigit()));
-        }
-        catch (const std::exception &e)
-        {
-            std::cerr << e.what() << '\n';
+        data_digit = stoull(all_message.substr(now_reading_position, getHashDigit()));
+        if (data_digit == string::npos)
             return kFailure;
-        }
         uint64_t hash;
-        try
-        {
-            hash = stoull(all_message.substr(now_reading_position + getHashDigit() + 1, getHashDigit()));
-        }
-        catch (const std::exception &e)
-        {
-            std::cerr << e.what() << '\n';
+        hash = stoull(all_message.substr(now_reading_position + getHashDigit() + 1, getHashDigit()));
+        if (hash == string::npos)
             return kFailure;
-        }
 
         uint64_t sentence_digit = data_digit + getHashDigit() * 2 + 1;
         message = all_message.substr(now_reading_position + getHashDigit() * 2 + 2, data_digit);
@@ -546,14 +510,14 @@ bool DataBase::crashRecovery()
 
 /* DataBase Delete, Insert, Read, Update */
 
-// deleteRecord(uint64_t id)のオーバーロード
+// deleteRecord(Id id)のオーバーロード
 bool DataBase::deleteRecord(const Record &target_record)
 {
     return deleteRecord(target_record.id);
 }
 
 // target_recordで指定したRecordを削除する
-bool DataBase::deleteRecord(uint64_t id)
+bool DataBase::deleteRecord(Id id)
 {
     // write_setにすでに登録済みか
     if (auto itr = write_set.find(id); itr != write_set.end())
@@ -569,9 +533,9 @@ bool DataBase::deleteRecord(uint64_t id)
     return kSuccess;
 }
 
-uint64_t DataBase::generateId()
+Id DataBase::generateId()
 {
-    uint64_t id = randID();
+    Id id = randID();
 
     auto primary_itr = primary_index.find(id);
     auto write_set_itr = write_set.find(id);
@@ -606,7 +570,7 @@ bool DataBase::insertRecord(Record &new_record)
     return kSuccess;
 }
 
-bool DataBase::searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets)
+bool DataBase::searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<Id> &column_sets)
 {
     // write set検索
     // write set(map型)内のRecordをすべて回す
@@ -630,7 +594,7 @@ bool DataBase::searchInWriteSet(const std::pair<std::string, std::string> column
     return kSuccess;
 }
 
-bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets)
+bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<Id> &column_sets)
 {
     // <column_name, column_value>のペアで、ID(複数・set型)を検索する
     if (auto column_index_itr = column_index.find(column_name_value_pair); column_index_itr != column_index.end())
@@ -664,7 +628,7 @@ bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_
     return kSuccess;
 }
 
-bool DataBase::mergeBeforeAfter(std::set<uint64_t> &base_set, std::set<uint64_t> &new_set)
+bool DataBase::mergeBeforeAfter(std::set<Id> &base_set, std::set<Id> &new_set)
 {
     auto itr0 = base_set.begin();
     auto itr1 = new_set.begin();
@@ -722,7 +686,7 @@ bool DataBase::readRecord(Columns columns, vector<Record> &return_records)
     // 2つsetを用意して、mergeする
     // 0: 今まで絞り込んだset
     // 1: 今から絞り込むset
-    set<uint64_t> column_sets[2];
+    set<Id> column_sets[2];
     int i = 0;
 
     // 条件を順番に調べていくぅ
@@ -769,7 +733,7 @@ bool DataBase::readRecord(Columns columns, vector<Record> &return_records)
     return kSuccess;
 }
 
-DataBase::Record *DataBase::searchRecordInWriteSetById(uint64_t id)
+DataBase::Record *DataBase::searchRecordInWriteSetById(Id id)
 {
     if (auto itr = write_set.find(id);
         itr != write_set.end())
@@ -783,7 +747,7 @@ DataBase::Record *DataBase::searchRecordInWriteSetById(uint64_t id)
 }
 
 // Idで指定したRecordをreturn_recordに代入する
-bool DataBase::readRecord(uint64_t id, Record &return_record)
+bool DataBase::readRecord(Id id, Record &return_record)
 {
     Record *rec = searchRecordInWriteSetById(id);
     if (rec != nullptr)
@@ -812,7 +776,7 @@ bool DataBase::readRecord(uint64_t id, Record &return_record)
     update_record_condition : 変更後のRecord
     target_recordを使用して、tableでの添字を取得し、update_record_conditionを代入する
 */
-bool DataBase::updateRecord(uint64_t id, Record &update_record_condition)
+bool DataBase::updateRecord(Id id, Record &update_record_condition)
 {
     update_record_condition.option = Record::UPDATE;
     // update_record_conditionが制約に反していないかチェックする
@@ -853,7 +817,7 @@ bool DataBase::updateRecord(uint64_t id, Record &update_record_condition)
     return kSuccess;
 }
 
-// updateRecord(uint64_t id, const Record &update_record_condition)のオーバーロード
+// updateRecord(Id id, const Record &update_record_condition)のオーバーロード
 bool DataBase::updateRecord(const Record &target_record, Record &update_record_condition)
 {
     return updateRecord(target_record.id, update_record_condition);

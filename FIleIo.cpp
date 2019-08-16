@@ -2,5 +2,7 @@
 
 FileIo::FileIo(char file_name[])
 {
-    file = open(file_name, O_WRONLY);
+
+    // log_file_name = file_name;
+    // file = open(file_name, O_WRONLY);
 }

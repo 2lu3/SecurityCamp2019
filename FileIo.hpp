@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
 #include <unistd.h>
 
 class FileIo
@@ -13,4 +14,5 @@ public:
 
 private:
     int file;
+    char log_file_name[];
 };
