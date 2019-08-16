@@ -570,7 +570,7 @@ bool DataBase::insertRecord(Record &new_record)
     return kSuccess;
 }
 
-bool DataBase::searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<Id> &column_sets)
+bool DataBase::searchInWriteSet(const Column column_name_value_pair, std::set<Id> &column_sets)
 {
     // write set検索
     // write set(map型)内のRecordをすべて回す
@@ -594,7 +594,7 @@ bool DataBase::searchInWriteSet(const std::pair<std::string, std::string> column
     return kSuccess;
 }
 
-bool DataBase::searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<Id> &column_sets)
+bool DataBase::searchInDB(const Column column_name_value_pair, std::set<Id> &column_sets)
 {
     // <column_name, column_value>のペアで、ID(複数・set型)を検索する
     if (auto column_index_itr = column_index.find(column_name_value_pair); column_index_itr != column_index.end())

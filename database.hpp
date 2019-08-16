@@ -158,8 +158,8 @@ public:
     bool writeDelete2WriteSetFromRedoLog(const std::string &message);
 
     /* read record 関連の補助関数 */
-    bool searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::Id> &column_sets);
-    bool searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::Id> &column_sets);
+    bool searchInWriteSet(const Column column_name_value_pair, std::set<std::Id> &column_sets);
+    bool searchInDB(const Column column_name_value_pair, std::set<std::Id> &column_sets);
     bool mergeBeforeAfter(std::set<Id> &base_set, std::set<Id> &new_set);
     Record *searchRecordInWriteSetById(Id id);
 
