@@ -157,21 +157,14 @@ bool DataBase::saveWriteSet2RedoLog(ofstream &file)
 
 bool DataBase::updateIndexOfDelete(uint64_t id)
 {
-    if (auto primary_index_itr = primary_index.find(id); primary_index_itr != primary_index.end())
+    auto itr = primary_index.find(id);
+    if (itr == primary_index.end())
+        return kFailure;
+    for (const auto &pair : itr->second.columns)
     {
-        // primary_indexに登録されていた場合
-
-        // column_indexから消去
-        // for(const auto &key_value_pair : record.columns)
-        for (const auto &key_values_pair : primary_index_itr->second.columns)
-        {
-            // column_index == map<key_values_pair, set<id>>
-            column_index[key_values_pair].erase(id);
-        }
-
-        // primary_indexからも削除
-        primary_index.erase(id);
+        column_index[pair].erase(id);
     }
+    primary_index.erase(id);
     return kSuccess;
 }
 
@@ -182,17 +175,13 @@ bool DataBase::updateIndexOfUpdate(const Record &record)
 
     for (; after_column_itr != record.columns.end(); ++before_column_itr, ++after_column_itr)
     {
-        // 前後で値が変わる場合
         if (before_column_itr->second != after_column_itr->second)
         {
-            // beforeを削除
             column_index[*before_column_itr].erase(record.id);
-            // afterを追加
             column_index[*after_column_itr].insert(record.id);
         }
     }
 
-    // primary_indexの更新
     primary_index[record.id] = record;
     return kSuccess;
 }
@@ -243,6 +232,18 @@ bool DataBase::updateIndexFromWriteSet()
     return kSuccess;
 }
 
+bool DataBase::writeCommitStart2RedoLog(ofstream &file)
+{
+    file << "CS\x1e" << flush;
+    return kSuccess;
+}
+
+bool DataBase::writeCommitFinish2RedoLog(ofstream &file)
+{
+    file << "CF\x1e" << flush;
+    return kSuccess;
+}
+
 bool DataBase::commit()
 {
 
@@ -255,8 +256,7 @@ bool DataBase::commit()
     }
 
     saveWriteSet2RedoLog(file);
-    // commit start
-    file << "CS\x1e" << flush;
+    writeCommitStart2RedoLog(file);
     file.close();
 
     return kSuccess;
@@ -264,8 +264,7 @@ bool DataBase::commit()
     // write_setの内容をprimary_indexに反映する
     updateIndexFromWriteSet();
 
-    // Commit Finish
-    file << "CF\x1e" << flush;
+    writeCommitFinish2RedoLog(file);
 
     return kSuccess;
 }
@@ -281,8 +280,7 @@ bool DataBase::commitTest()
     }
 
     saveWriteSet2RedoLog(file);
-    // commit start
-    file << "CS\x1e" << std::flush;
+    writeCommitStart2RedoLog(file);
     file.close();
 
     cout << "recovery start " << endl;
@@ -298,7 +296,7 @@ bool DataBase::abort()
     return kSuccess;
 }
 
-bool DataBase::substituteNameValue4Record(const std::string &message, uint32_t start_pos, Record &record)
+bool DataBase::deserializeNameValue4Record(const std::string &message, uint32_t start_pos, Record &record)
 {
     uint32_t end_pos;
     // keyとvalueの読み込み
@@ -307,12 +305,28 @@ bool DataBase::substituteNameValue4Record(const std::string &message, uint32_t s
     do
     {
         // key
-        end_pos = message.find('\x1f', start_pos + 1);
+        try
+        {
+            end_pos = message.find('\x1f', start_pos + 1);
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << e.what() << '\n';
+            return kFailure;
+        }
         key = message.substr(start_pos + 1, end_pos - start_pos - 1);
         start_pos = end_pos;
 
         // value
-        end_pos = message.find('\x1f', start_pos + 1);
+        try
+        {
+            end_pos = message.find('\x1f', start_pos + 1);
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << e.what() << '\n';
+            return kFailure;
+        }
         value = message.substr(start_pos + 1, end_pos - start_pos - 1);
         start_pos = end_pos;
         record.columns[key] = value;
@@ -320,12 +334,31 @@ bool DataBase::substituteNameValue4Record(const std::string &message, uint32_t s
     return kSuccess;
 }
 
-uint32_t DataBase::substituteID4Record(const string &message, Record &record)
+uint32_t DataBase::deserializeID4Record(const string &message, Record &record)
 {
     uint32_t start_pos = 2;
-    uint32_t end_pos = message.find('\x1f', start_pos + 1);
+    uint32_t end_pos;
+    try
+    {
+        end_pos = message.find('\x1f', start_pos + 1);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << '\n';
+        return kFailure;
+    }
     cout << message.substr(start_pos + 1, end_pos - start_pos - 1) << endl;
-    uint64_t id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
+    uint64_t id;
+    try
+    {
+        id = stoull(message.substr(start_pos + 1, end_pos - start_pos - 1));
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << '\n';
+        return kFailure;
+    }
+
     record.id = id;
     return end_pos;
 }
@@ -336,9 +369,9 @@ bool DataBase::writeInsert2WriteSetFromRedoLog(const string &message)
     record.option = Record::INSERT;
     uint32_t position;
     // IDをrecordにセット
-    position = substituteID4Record(message, record);
+    position = deserializeID4Record(message, record);
     // NameとValueをrecordにセット
-    substituteNameValue4Record(message, position, record);
+    deserializeNameValue4Record(message, position, record);
 
     if (checkRecord(record) == kFailure)
     {
@@ -355,9 +388,9 @@ bool DataBase::writeUpdate2WriteSetFromRedoLog(const string &message)
     record.option = Record::UPDATE;
     uint32_t position;
     // IDをrecordにセット
-    position = substituteID4Record(message, record);
+    position = deserializeID4Record(message, record);
     // NameとValueをrecordにセット
-    substituteNameValue4Record(message, position, record);
+    deserializeNameValue4Record(message, position, record);
 
     // primary_indexに追加済みの場合
     if (checkRecord(record) == kFailure)
@@ -371,7 +404,7 @@ bool DataBase::writeDelete2WriteSetFromRedoLog(const std::string &message)
 {
     Record record;
     record.option = Record::DELETE;
-    substituteID4Record(message, record);
+    deserializeID4Record(message, record);
     write_set[record.id] = record;
     return kSuccess;
 }
@@ -399,8 +432,27 @@ bool DataBase::createWriteSetWithCheck(stringstream &sstream)
     uint64_t now_reading_position = 0;
     while (now_reading_position < all_message_size - 3)
     {
-        uint64_t data_digit = stoull(all_message.substr(now_reading_position, getHashDigit()));
-        uint64_t hash = stoull(all_message.substr(now_reading_position + getHashDigit() + 1, getHashDigit()));
+        uint64_t data_digit;
+        try
+        {
+            data_digit = stoull(all_message.substr(now_reading_position, getHashDigit()));
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << e.what() << '\n';
+            return kFailure;
+        }
+        uint64_t hash;
+        try
+        {
+            hash = stoull(all_message.substr(now_reading_position + getHashDigit() + 1, getHashDigit()));
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << e.what() << '\n';
+            return kFailure;
+        }
+
         uint64_t sentence_digit = data_digit + getHashDigit() * 2 + 1;
         message = all_message.substr(now_reading_position + getHashDigit() * 2 + 2, data_digit);
 
@@ -517,9 +569,8 @@ bool DataBase::deleteRecord(uint64_t id)
     return kSuccess;
 }
 
-bool DataBase::setID2Record(Record &target_record)
+uint64_t DataBase::generateId()
 {
-    // primary_indexにもwrite_setにもないidをランダムで生成
     uint64_t id = randID();
 
     auto primary_itr = primary_index.find(id);
@@ -531,9 +582,12 @@ bool DataBase::setID2Record(Record &target_record)
         primary_itr = primary_index.find(id);
         write_set_itr = write_set.find(id);
     }
+    return id;
+}
 
-    // idをセット
-    target_record.id = id;
+bool DataBase::setID2Record(Record &target_record)
+{
+    target_record.id = generateId();
     return kSuccess;
 }
 
@@ -686,6 +740,7 @@ bool DataBase::readRecord(Columns columns, vector<Record> &return_records)
         {
             continue;
         }
+
         searchInDB(column_name_value_pair, column_sets[i == 0]);
         mergeBeforeAfter(column_sets[0], column_sets[1]);
         ++i;
@@ -714,36 +769,42 @@ bool DataBase::readRecord(Columns columns, vector<Record> &return_records)
     return kSuccess;
 }
 
-// Idで指定したRecordをreturn_recordに代入する
-bool DataBase::readRecord(uint64_t id, Record &return_record)
+DataBase::Record *DataBase::searchRecordInWriteSetById(uint64_t id)
 {
-
-    if (auto write_set_itr = write_set.find(id); write_set_itr != write_set.end())
+    if (auto itr = write_set.find(id);
+        itr != write_set.end())
     {
-        if (write_set_itr->second.option == Record::DELETE)
-        {
-            // 削除済みの場合
-            return kFailure;
-        }
-        else
-        {
-            return_record = write_set_itr->second;
-        }
+        return &(itr->second);
     }
     else
     {
-        if (auto iterator = primary_index.find(id); iterator != primary_index.end())
-        {
-            return_record = iterator->second;
-            return kSuccess;
-        }
-        else
-        {
-            cerr << FUNCNAME << "(): Error" << endl;
-            return kFailure;
-        }
+        return nullptr;
     }
-    return kSuccess;
+}
+
+// Idで指定したRecordをreturn_recordに代入する
+bool DataBase::readRecord(uint64_t id, Record &return_record)
+{
+    Record *rec = searchRecordInWriteSetById(id);
+    if (rec != nullptr)
+    {
+        if (rec->option == Record::DELETE)
+            return kFailure;
+        return_record = *rec;
+        return kSuccess;
+    }
+
+    auto itr = primary_index.find(id);
+    if (itr == primary_index.end())
+    {
+        return kFailure;
+    }
+    else
+    {
+        rec = &itr->second;
+        return_record = *rec;
+        return kSuccess;
+    }
 }
 
 /*

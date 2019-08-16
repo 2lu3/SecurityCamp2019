@@ -34,7 +34,13 @@
 class DataBase
 {
 public:
-    using Columns = std::map<std::string, std::string>;
+    // column_name, column value
+    using Id = std::uint64_t;
+    using ColumnName = std::string;
+    using ColumnValue = std::string;
+    using Column = std::pair<ColumnName, ColumnValue>;
+    using Columns = std::map<ColumnName, ColumnValue>;
+    using ColumnIndexes = std::map<Column, std::set<Id>>;
     DataBase();
 
     /*  制約
@@ -126,6 +132,7 @@ public:
     // Recordが制約に収まっているかチェックする
     bool
     checkRecord(const Record &check_record);
+    std::uint64_t generateId();
     bool setID2Record(Record &target_record);
 
     /* commit 関連の補助関数 */
@@ -134,14 +141,16 @@ public:
     bool updateIndexOfDelete(std::uint64_t id);     // updateIndexFromSet専用
     bool updateIndexOfUpdate(const Record &record); // updateIndexFromSet専用
     bool updateIndexOfInsert(const Record &record); // updateIndexFromSet専用
+    bool writeCommitStart2RedoLog(std::ofstream &file);
+    bool writeCommitFinish2RedoLog(std::ofstream &file);
 
     /* crash recovery 関連の補助関数*/
     // redo.logを格納したsstreamを読み込み、write_setに変換する
     bool createWriteSetWithCheck(std::stringstream &sstream);
     // createWriteSetWithCheck専用
-    bool substituteNameValue4Record(const std::string &message, std::uint32_t start_pos, Record &record);
+    bool deserializeNameValue4Record(const std::string &message, std::uint32_t start_pos, Record &record);
     // createWriteSetWithCheck専用
-    std::uint32_t substituteID4Record(const std::string &message, Record &record);
+    std::uint32_t deserializeID4Record(const std::string &message, Record &record);
     // createWriteSetWithCheck専用
     bool writeInsert2WriteSetFromRedoLog(const std::string &message);
     // createWriteSetWithCheck専用
@@ -152,15 +161,12 @@ public:
     bool searchInWriteSet(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets);
     bool searchInDB(const std::pair<std::string, std::string> column_name_value_pair, std::set<std::uint64_t> &column_sets);
     bool mergeBeforeAfter(std::set<uint64_t> &base_set, std::set<uint64_t> &new_set);
+    Record *searchRecordInWriteSetById(uint64_t id);
 
     std::set<std::string> column_names = {"name", "age"};
 
-    // id-tableの添字を格納する
-    // update : write_setに書き換えたものを代入
-    // insert : primary_indexにないidを追加
-    // delete : map.size() = 0
     std::map<std::uint64_t, Record> write_set;
-    // map<pair<column名, value>, set<id>> : keyを指定したうえで、valueからidを効率的に探す
+
 private:
     uint32_t getHashDigit()
     {
