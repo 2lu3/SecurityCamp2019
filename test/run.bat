@@ -1,1 +1,0 @@
-g++ main.cpp A.cpp B.cpp -o main.exe & main.exe
